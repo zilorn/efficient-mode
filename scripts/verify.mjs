@@ -15,6 +15,8 @@
  * 5. The compaction row still declares the 60% auto-compaction threshold and
  *    keeps its `auto` switch a plain boolean, and the rendered prompt tells the
  *    agent that trigger.
+ * 6. The workspace-instruction row is still mounted with the byte budget the
+ *    shipped `standard` preset uses, so AGENTS.md files reach the agent.
  *
  * Exits non-zero on any failed check. Prints the rendered prompt last.
  *
@@ -57,6 +59,20 @@ const REQUIRED_ROW_CONFIG = new Map([
 const EXPECTED_COMPACTION = {
   row: '@deepseek-ai/dsh-compaction-basic',
   thresholdRatio: 0.6,
+}
+
+/**
+ * Workspace-instruction row Efficient Mode depends on.
+ *
+ * An agent preset's `plugins` list is the whole composition for that agent, so
+ * the profile-level row `dsh-base` mounts does not reach this preset: without
+ * its own copy the agent never sees the project's AGENTS.md/CLAUDE.md files.
+ * `maxBytes` is required by the row and caps the rendered baseline; 65536 is
+ * the budget the shipped `standard` preset passes.
+ */
+const EXPECTED_INSTRUCTIONS = {
+  row: '@deepseek-ai/dsh-agent-instructions',
+  maxBytes: 65536,
 }
 
 /** Read one scalar key from a row's own block, ignoring nested rows. */
@@ -182,6 +198,23 @@ if (compactionRow === undefined) {
   compactionSummary = `compaction: thresholdRatio ${thresholdRaw ?? '(absent)'}, auto ${auto ?? '(absent)'}`
 }
 
+let instructionsSummary = `instructions: no ${EXPECTED_INSTRUCTIONS.row} row found`
+const instructionsRow = rows.find((row) => row.name === EXPECTED_INSTRUCTIONS.row)
+if (instructionsRow === undefined) {
+  problems.push(
+    `no ${EXPECTED_INSTRUCTIONS.row} row found; the agent would not see the project's AGENTS.md files`,
+  )
+} else {
+  const maxBytesRaw = rowScalar(instructionsRow.body, 'maxBytes')
+  if (Number(maxBytesRaw) !== EXPECTED_INSTRUCTIONS.maxBytes) {
+    problems.push(
+      `instructions row declares maxBytes ${maxBytesRaw ?? '(absent, but required)'}, `
+      + `expected ${EXPECTED_INSTRUCTIONS.maxBytes}`,
+    )
+  }
+  instructionsSummary = `instructions: maxBytes ${maxBytesRaw ?? '(absent)'}`
+}
+
 const references = [...new Set([...template.matchAll(/\{\{([^{}]*)\}\}/g)].map((match) => match[1]))]
 for (const name of references) {
   if (name !== name.toLowerCase() || !/^[a-z][a-z0-9_]*$/.test(name)) {
@@ -232,6 +265,7 @@ if (rendered !== undefined) {
 console.log(`template: ${template.split('\n').length} lines, ${references.length} prompt variables`)
 console.log(`required-config rows checked: ${checkedRows}`)
 console.log(compactionSummary)
+console.log(instructionsSummary)
 for (const name of references) {
   const value = providers.get(name)?.(context)
   const first = String(value).split('\n')[0]
