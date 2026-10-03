@@ -12,6 +12,8 @@
  *    rendering it empty.
  * 4. The template is rendered with a synthetic assembly context, which also
  *    proves the git probe answers for this directory.
+ * 5. The compaction row still declares the 60% auto-compaction threshold and
+ *    keeps its `auto` switch a plain boolean.
  *
  * Exits non-zero on any failed check. Prints the rendered prompt last.
  *
@@ -41,6 +43,26 @@ const REQUIRED_ROW_CONFIG = new Map([
   ['@deepseek-ai/dsh-tool-fs-search', ['sampleOverCapGlobResults']],
   ['@deepseek-ai/dsh-persona', ['prefix']],
 ])
+
+/**
+ * Compaction settings Efficient Mode promises.
+ *
+ * The preset auto-compacts once context pressure crosses 60% of the routed
+ * model's window, and the `auto` key is the switch that removes that behavior
+ * again while leaving `/compact` in place. The threshold is easy to lose
+ * silently when the patch is regenerated, so it is asserted exactly; the switch
+ * only has to stay a boolean, so either position is one edit away.
+ */
+const EXPECTED_COMPACTION = {
+  row: '@deepseek-ai/dsh-compaction-basic',
+  thresholdRatio: 0.6,
+}
+
+/** Read one scalar key from a row's own block, ignoring nested rows. */
+function rowScalar(body, key) {
+  const match = new RegExp(`(?:^|\\n)\\s*${key}:\\s*(\\S+)`).exec(body)
+  return match === null ? undefined : match[1]
+}
 
 /**
  * Split the patch into one entry per row that declares a `name`.
@@ -126,7 +148,8 @@ const patchText = readFileSync(PATCH_PATH, 'utf8')
 const template = extractTemplate(patchText)
 
 let checkedRows = 0
-for (const { name, body } of rowBlocks(patchText)) {
+const rows = rowBlocks(patchText)
+for (const { name, body } of rows) {
   const required = REQUIRED_ROW_CONFIG.get(name)
   if (required === undefined) continue
   checkedRows += 1
@@ -135,6 +158,27 @@ for (const { name, body } of rowBlocks(patchText)) {
       problems.push(`row ${name} omits the required config key "${key}", which fails the whole preset at load`)
     }
   }
+}
+
+let compactionSummary = `compaction: no ${EXPECTED_COMPACTION.row} row found`
+const compactionRow = rows.find((row) => row.name === EXPECTED_COMPACTION.row)
+if (compactionRow === undefined) {
+  problems.push(`no ${EXPECTED_COMPACTION.row} row found; automatic compaction is not mounted`)
+} else {
+  const thresholdRaw = rowScalar(compactionRow.body, 'thresholdRatio')
+  const threshold = Number(thresholdRaw)
+  if (thresholdRaw === undefined || !Number.isFinite(threshold)
+    || threshold !== EXPECTED_COMPACTION.thresholdRatio) {
+    problems.push(
+      `compaction row declares thresholdRatio ${thresholdRaw ?? '(absent, so default 0.8)'}, `
+      + `expected ${EXPECTED_COMPACTION.thresholdRatio}; auto-compaction would not trigger at 60%`,
+    )
+  }
+  const auto = rowScalar(compactionRow.body, 'auto')
+  if (auto !== 'true' && auto !== 'false') {
+    problems.push('compaction row must set the auto switch to true or false')
+  }
+  compactionSummary = `compaction: thresholdRatio ${thresholdRaw ?? '(absent)'}, auto ${auto ?? '(absent)'}`
 }
 
 const references = [...new Set([...template.matchAll(/\{\{([^{}]*)\}\}/g)].map((match) => match[1]))]
@@ -179,6 +223,7 @@ if (rendered !== undefined) {
 
 console.log(`template: ${template.split('\n').length} lines, ${references.length} prompt variables`)
 console.log(`required-config rows checked: ${checkedRows}`)
+console.log(compactionSummary)
 for (const name of references) {
   const value = providers.get(name)?.(context)
   const first = String(value).split('\n')[0]
