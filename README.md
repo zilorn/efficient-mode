@@ -1,9 +1,8 @@
 # 高效模式 · DSH Agent 预设插件
 
 一个 DeepSeek Harness（dsh）插件包。它向 Agent 预设名册注册一个名为 **高效模式** 的预设，
-预设的基础提示词就是 `~/Documents/System prompt.md` 的正文，其中的 `[]` 占位符不再写死，
-而是每次组装提示词时由本插件注册的提示词变量实时填充；生成时还会在正文里追加一段
-自动压缩说明。
+预设的基础提示词就是仓库根目录 `base-prompt.md` 的正文，其中的 `[]` 占位符不再写死，
+而是每次组装提示词时由本插件注册的提示词变量实时填充。
 
 - 预设 id：`efficient`
 - 预设名称：`高效模式`
@@ -39,6 +38,7 @@
 ```
 better-system-prompt/
 ├── package.json           # bundle 清单：dsh.bundle.patch、locale 与 icon 导出
+├── base-prompt.md         # 基础提示词模板：正文 + 11 个 {{variable}} 引用
 ├── cordis.patch.yml       # 预设声明 + persona 模板 + 工具行（由脚本生成）
 ├── index.js               # Host 插件：注册 11 个提示词变量
 ├── locale/
@@ -46,7 +46,7 @@ better-system-prompt/
 │   └── zh.json            # 同上（中文）
 ├── icon.svg               # 插件图标
 ├── scripts/
-│   ├── build-patch.mjs    # 从基础提示词文件重新生成 cordis.patch.yml
+│   ├── build-patch.mjs    # 从 base-prompt.md 重新生成 cordis.patch.yml
 │   └── verify.mjs         # 离线自检：变量覆盖、渲染、快照稳定性
 └── README.md
 ```
@@ -132,23 +132,23 @@ todo、ask_user_question、present。
 开关要改脚本里的 YAML 模板并重新生成。profile 是以链接方式安装的，dsh 启动时重新
 读取 bundle 的 patch 文件，所以重启后新建的会话按新值触发。
 
-这件事也写进了基础提示词。源文件在仓库之外、不随仓库版本化，所以说明由生成器提供：
-`scripts/build-patch.mjs` 的 `AUTO_COMPACTION_NOTE` 会在源模板的 Context management
-段落后追加一句，讲明 60% 触发与开关；锚点句子匹配不上就报错退出，不会静默丢掉。
-`scripts/verify.mjs` 会检查渲染后的提示词里出现配置的百分比。
+这件事也写进了基础提示词，就放在 `base-prompt.md` 的 Context management 段落里，随
+模板一起版本化；`scripts/verify.mjs` 会检查渲染后的提示词里出现配置的百分比。
 
 ## 修改基础提示词
 
-模板是生成出来的，不要直接改 `cordis.patch.yml` 里的 prefix 块：
+模板是生成出来的，不要直接改 `cordis.patch.yml` 里的 prefix 块。源模板是仓库根目录的
+`base-prompt.md`，改完重新生成：
 
 ```
-node scripts/build-patch.mjs "/path/to/System prompt.md"
+node scripts/build-patch.mjs
 ```
 
-脚本按固定映射替换占位符（映射表在 `scripts/build-patch.mjs` 的 `REPLACEMENTS`），
-任何一条匹配不上就报错退出，避免静默漏替换。除占位符外，脚本还会在源文件的
-Context management 段落后追加自动压缩说明，锚点句子同样要求精确匹配。改完重新安装
-bundle，新会话才会用上；已经开着的会话保留它启动时的插件版本。
+也可以把别的文件路径作为参数传给脚本。脚本按固定映射替换占位符（映射表在
+`scripts/build-patch.mjs` 的 `REPLACEMENTS`），任何一条匹配不上就报错退出，避免静默
+漏替换。这份模板原本复制自 `~/Documents/System prompt.md`；迁移之后以仓库内版本为准，
+外部那份不再参与生成。profile 是链接安装，dsh 启动时重新读取 patch，所以改完重启即可；
+新会话用上新提示词，已经开着的会话保留它启动时的插件版本。
 
 只想调整 git 事实的细节（例如列出几条最近提交），可以给 `prompt-facts` 行加配置：
 

@@ -5,8 +5,8 @@
 A dsh (DeepSeek Harness) plugin bundle that registers one Agent preset: **Efficient Mode**
 (id `efficient`).
 
-- The preset's base prompt is the body of `~/Documents/System prompt.md`, kept verbatim except for
-  11 `[]` placeholders, which become `{{variable}}` references.
+- The preset's base prompt is the body of [base-prompt.md](base-prompt.md), kept verbatim except
+  for 11 `[]` placeholders, which become `{{variable}}` references.
 - A Host plugin shipped in this package ([index.js](index.js)) resolves those variables on every
   prompt assembly: current branch, main branch, committer, working-tree status, last 3 commits,
   working directory, is-git-repository, platform, shell, OS version, today's date.
@@ -15,7 +15,7 @@ A dsh (DeepSeek Harness) plugin bundle that registers one Agent preset: **Effici
 
 Layout: [cordis.patch.yml](cordis.patch.yml) declares the preset and the plugin rows it mounts,
 [index.js](index.js) supplies the dynamic facts, [scripts/build-patch.mjs](scripts/build-patch.mjs)
-generates the former from the prompt file, and
+generates the former from [base-prompt.md](base-prompt.md), and
 [scripts/verify.mjs](scripts/verify.mjs) checks the two halves against each other.
 
 ## Stack
@@ -33,7 +33,7 @@ generates the former from the prompt file, and
 ## Commands
 
 ```bash
-# Regenerate cordis.patch.yml from the base-prompt file (default source: ~/Documents/System prompt.md)
+# Regenerate cordis.patch.yml from the base-prompt template (default source: base-prompt.md)
 node scripts/build-patch.mjs
 
 # Offline self-check: variable coverage, required config keys, render stability. Non-zero on failure.
@@ -57,7 +57,7 @@ browser.
 ## Notes
 
 - **Never hand-edit the `prefix` block in `cordis.patch.yml`.** `scripts/build-patch.mjs` generates
-  it; edit the source prompt file and re-run the script.
+  it; edit [base-prompt.md](base-prompt.md) and re-run the script.
 - **Never drop a row's `config` on a hunch.** A missing required key fails that row, and one failed
   row fails the **whole preset**: the roster card shows 加载失败 and no session can use it. Known
   required keys are `sampleOverCapGlobResults` on `dsh-tool-fs-search`, `prefix` on `dsh-persona`,
@@ -82,11 +82,10 @@ browser.
   `thresholdRatio: 0.6`, so pressure triggers at 60% of the routed model's window, and `auto` is the
   switch whose `false` keeps only manual `/compact`. Both live in the YAML template of
   [scripts/build-patch.mjs](scripts/build-patch.mjs): edit there and regenerate; the linked profile
-  install re-reads a bundle patch at boot, so restart dsh to apply. The base prompt states the
-  trigger too: the generator appends `AUTO_COMPACTION_NOTE` after the source template's Context
-  management paragraph, because that source file lives outside this repository and is not versioned
-  here. [scripts/verify.mjs](scripts/verify.mjs) asserts the 60% threshold, the boolean switch, and
-  that the rendered prompt names the configured percentage.
+  install re-reads a bundle patch at boot, so restart dsh to apply. The base prompt tells the agent
+  the same trigger in the Context management section of [base-prompt.md](base-prompt.md).
+  [scripts/verify.mjs](scripts/verify.mjs) asserts the 60% threshold, the boolean switch, and that
+  the rendered prompt names the configured percentage.
 - **Reinstall after changes.** A local directory installs as a link, but an already-loaded JS module
   only refreshes when the dsh process restarts.
 
