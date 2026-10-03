@@ -97,6 +97,12 @@ browser.
   the same trigger in the Context management section of [base-prompt.md](base-prompt.md).
   [scripts/verify.mjs](scripts/verify.mjs) asserts the 60% threshold, the boolean switch, and that
   the rendered prompt names the configured percentage.
+- **Tool guidance is restated in the template.** Tools and Goals and delegation in
+  [base-prompt.md](base-prompt.md) carry the rules dsh's tool plugins also register as sections
+  (read/write/edit, glob/grep, background jobs, web, skills, goals, delegation), because
+  `complete: true` can collapse those sections away. [scripts/verify.mjs](scripts/verify.mjs)
+  asserts one marker phrase per rule. When dsh changes its own wording, decide deliberately
+  whether to sync the template copy.
 - **Reinstall after changes.** A local directory installs as a link, but an already-loaded JS module
   only refreshes when the dsh process restarts.
 

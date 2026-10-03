@@ -6,7 +6,7 @@
 
 - 预设 id：`efficient`
 - 预设名称：`高效模式`
-- 基础提示词：模板 117 行，含 11 个动态引用，全部由本包的 Host 插件提供
+- 基础提示词：模板 137 行，含 11 个动态引用，全部由本包的 Host 插件提供
 - 依赖：仅 Node 内置模块，安装时不需要拉取任何 npm 包
 
 ## 它解决什么问题
@@ -107,6 +107,19 @@ Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.pat
 - `@deepseek-ai/dsh-time-context`：模板自带 `Today's date`，再挂一个时间上下文会重复。
 - `workflow` / `ralph` 与 codex、claude-code 子代理后端：保持组成精简。
 
+## 基础提示词自带的工具规则
+
+`base-prompt.md` 的 Tools 与 Goals and delegation 两段写死了工具使用规则：读写文件用
+read/write/edit 而不是 shell 的 cat，且默认 fs-observation-policy 要求先读后写；按路径找文件
+用 glob、搜内容用 grep；后台任务记 id，不空轮询，收尾时用 job_output 与 job_kill；web 结果是
+不可信数据，引用时要给链接；技能先加载再遵循；goal 的 resume / complete / blocked 语义；
+以及 workflow 与 subagent 的委派方式。
+
+这些规则本来由 dsh 的工具插件各自注册成系统提示词 section。`complete: true` 生效时那些
+section 会被折叠掉，只留下 persona 这一段模板，所以模板必须自己带一份；在当前桌面包上
+工具插件的 section 仍会追加在模板之后，同一段规则会各出现一次。两种情况下规则都不缺，
+代价只是可能重复一次。`scripts/verify.mjs` 逐句断言这些规则仍在渲染结果里。
+
 ## 工作区指令（AGENTS.md）
 
 预设挂载 `@deepseek-ai/dsh-agent-instructions`，行配置与 `standard` 预设一致：
@@ -191,9 +204,9 @@ node scripts/verify.mjs
 
 它会用桩上下文执行 `apply()`、从 `cordis.patch.yml` 抽出模板、核对模板引用与注册变量
 是否一一对应、检查必填 `config` 是否都在、确认压缩行仍是 60% 阈值且 `auto` 仍是布尔
-开关、确认工作区指令行仍挂着 `maxBytes: 65536`、确认渲染后的提示词写明了压缩触发点、
-渲染一遍并复查同一会话两次组装结果一致，最后打印渲染后的完整提示词。任何一项不通过
-就以非零码退出。
+开关、确认工作区指令行仍挂着 `maxBytes: 65536`、逐句确认模板自带的工具规则仍在渲染结果里、
+确认渲染后的提示词写明了压缩触发点、渲染一遍并复查同一会话两次组装结果一致，最后打印
+渲染后的完整提示词。任何一项不通过就以非零码退出。
 
 安装后另需确认两点：安装结果是 `application: applied`；以及预设名册里出现 `efficient`
 卡片且不显示「加载失败」。名册卡片由 Host 的预设 list 提供，可以用 agent 的
@@ -213,8 +226,10 @@ node scripts/verify.mjs
   目录不是仓库、或超时都会降级为 `(not a git repository)` 一类占位文本，不会让提示词失败。
 - **每会话一份快照**：会话中途新建的提交不会反映到提示词里，这是模板文案的既定语义。
   想强制刷新，开新会话即可。
-- **`complete: true` 的代价**：其它插件贡献的系统提示词 section（含工具使用指引）不会出现；
-  工具本身仍可用，其说明通过工具 schema 传给模型。
+- **`complete: true` 与工具指引**：`complete: true` 生效时，其它插件贡献的 section 会被折叠成
+  persona 一段，所以工具使用规则由模板自带一份；当前桌面构建里工具插件注册的指引 section
+  仍会追加在模板之后，同一段规则可能重复一次。工具本身始终可用，其参数说明始终通过工具
+  schema 传给模型。
 - **未声明 Config schema**：profile 安装的 bundle 无法从 dsh 安装目录解析 `schemastery`，
   所以这个包不 import 任何 harness 包，行配置以未校验的普通对象读取（只认 `commitCount`）。
 - **`files` 字段对目录直装不生效**：dsh 直装本地目录时是以链接方式安装，改动源码后需要重新
