@@ -178,8 +178,14 @@
               compaction: true
               toolResultPruner: true
             config:
+              # Automatic compaction triggers once context pressure crosses 60%
+              # of the routed model's window. The auto key is the switch: set it
+              # to false to keep only the manual /compact path.
               - id: compaction-basic
                 name: '@deepseek-ai/dsh-compaction-basic'
+                config:
+                  thresholdRatio: 0.6
+                  auto: true
               - id: command-compact
                 name: '@deepseek-ai/dsh-command-compact'
               - id: tool-result-pruner
