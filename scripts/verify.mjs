@@ -30,6 +30,45 @@ const PATCH_PATH = resolve(PACKAGE_ROOT, 'cordis.patch.yml')
 /** Indentation of the template text inside the patch document. */
 const TEMPLATE_INDENT = 16
 
+/**
+ * Config keys a row requires and cannot default.
+ *
+ * A row that omits one fails to load, and one failed row fails the whole
+ * preset: the roster then shows the preset as failed and no session can use it.
+ * Only keys documented as required belong here; optional keys may be absent.
+ */
+const REQUIRED_ROW_CONFIG = new Map([
+  ['@deepseek-ai/dsh-tool-fs-search', ['sampleOverCapGlobResults']],
+  ['@deepseek-ai/dsh-persona', ['prefix']],
+])
+
+/**
+ * Split the patch into one entry per row that declares a `name`.
+ *
+ * A row's block ends at the next line indented less than its own `name:` line,
+ * which is the sibling `- id:` line that starts the following row. Sibling keys
+ * of the same row (`config:`) sit at the same indentation and stay inside it.
+ * @param text - the patch document.
+ * @returns each row's module name and the lines that belong to it.
+ */
+function rowBlocks(text) {
+  const lines = text.split('\n')
+  const blocks = []
+  lines.forEach((line, index) => {
+    const match = /^(\s*)name: '([^']+)'/.exec(line)
+    if (match === null) return
+    const indent = match[1].length
+    const body = []
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const candidate = lines[cursor]
+      if (candidate.trim() !== '' && candidate.length - candidate.trimStart().length < indent) break
+      body.push(candidate)
+    }
+    blocks.push({ name: match[2], body: body.join('\n') })
+  })
+  return blocks
+}
+
 /** Collect the variable providers `apply()` registers, without a live context. */
 function collectProviders() {
   const providers = new Map()
@@ -83,7 +122,20 @@ function render(template, providers, context) {
 const problems = []
 
 const providers = collectProviders()
-const template = extractTemplate(readFileSync(PATCH_PATH, 'utf8'))
+const patchText = readFileSync(PATCH_PATH, 'utf8')
+const template = extractTemplate(patchText)
+
+let checkedRows = 0
+for (const { name, body } of rowBlocks(patchText)) {
+  const required = REQUIRED_ROW_CONFIG.get(name)
+  if (required === undefined) continue
+  checkedRows += 1
+  for (const key of required) {
+    if (!new RegExp(`(^|\\n)\\s*${key}:`).test(body)) {
+      problems.push(`row ${name} omits the required config key "${key}", which fails the whole preset at load`)
+    }
+  }
+}
 
 const references = [...new Set([...template.matchAll(/\{\{([^{}]*)\}\}/g)].map((match) => match[1]))]
 for (const name of references) {
@@ -126,6 +178,7 @@ if (rendered !== undefined) {
 }
 
 console.log(`template: ${template.split('\n').length} lines, ${references.length} prompt variables`)
+console.log(`required-config rows checked: ${checkedRows}`)
 for (const name of references) {
   const value = providers.get(name)?.(context)
   const first = String(value).split('\n')[0]

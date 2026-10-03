@@ -1,5 +1,5 @@
 {
-  "name": "@local/dsh-efficient-mode",
+  "name": "@zilorn/dsh-efficient-mode",
   "version": "1.0.0",
   "private": true,
   "type": "module",

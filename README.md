@@ -50,16 +50,28 @@ better-system-prompt/
 └── README.md
 ```
 
+## 关于 `@deepseek-ai/` 前缀
+
+`cordis.patch.yml` 里绝大多数行写的是 `name: '@deepseek-ai/dsh-xxx'`，这些**不是本项目的包**，
+而是 dsh 自身随安装分发的插件包。Loader 按这个模块名加载插件，名字必须与 dsh 内部的包名逐字
+一致；换成本地名字，那一行就解析不到，整个预设跟着加载失败。能改的只有本项目自己的包，它用你
+自己的 scope：`@zilorn/dsh-efficient-mode`。要换 scope，同时改 `package.json` 的 `name` 和
+`cordis.patch.yml` 里 `prompt-facts` 那一行的 `name` 即可（先卸载旧包再装新的）。
+
 ## 安装
 
-用 dsh 的插件管理器安装这个目录（需要 Full access 或逐次批准）：
+命令行安装：
 
-```
-plugin_manager install_bundle  target=<本目录绝对路径>
+```bash
+dsh plugin --profile desktop add /home/zilorn/Projects/better-system-prompt
 ```
 
-安装后 `cordis.patch.yml` 里的 `preset-efficient` 行进入 Loader，预设名册出现
-「高效模式」。新建会话时在选择器里选它即可；也可以把它设为新会话默认预设。
+Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.patch.yml` 里的
+`preset-efficient` 行进入 Loader，预设名册出现「高效模式」，新建会话时在选择器里选它即可，
+也可以把它设为新会话的默认预设。
+
+如果在 dsh 会话里让 agent 装，用的是插件管理工具（`plugin_manager` 的 `install_bundle`，
+`target` 传本目录绝对路径）。那是 agent 工具调用，不是 shell 命令。
 
 ## 工作原理
 
@@ -113,7 +125,7 @@ node scripts/build-patch.mjs "/path/to/System prompt.md"
 
 ```
           - id: prompt-facts
-            name: '@local/dsh-efficient-mode'
+            name: '@zilorn/dsh-efficient-mode'
             config:
               commitCount: 5
 ```
@@ -127,16 +139,22 @@ node scripts/verify.mjs
 ```
 
 它会用桩上下文执行 `apply()`、从 `cordis.patch.yml` 抽出模板、核对模板引用与注册变量
-是否一一对应、渲染一遍并复查同一会话两次组装结果一致，最后打印渲染后的完整提示词。
-任何一项不通过就以非零码退出。
+是否一一对应、检查必填 `config` 是否都在、渲染一遍并复查同一会话两次组装结果一致，最后
+打印渲染后的完整提示词。任何一项不通过就以非零码退出。
 
-安装后另需确认两点：插件管理器返回 `application: applied`；以及预设名册里出现
-`efficient` 行（可用 `cordis_inspect_query` 查 `Config.listConfigs`，过滤
-`@deepseek-ai/dsh-agent-preset`）。会话内实际渲染出来的提示词只能在选中该预设的新会话里
-确认。
+安装后另需确认两点：安装结果是 `application: applied`；以及预设名册里出现 `efficient`
+卡片且不显示「加载失败」。名册卡片由 Host 的预设 list 提供，可以用 agent 的
+`cordis_inspect_query` 查 `Config.listConfigs`（过滤 `@deepseek-ai/dsh-agent-preset`）确认
+`preset-efficient` 行存在。卡片里的诊断文字和会话内实际渲染出来的提示词，只能在浏览器和
+选中该预设的新会话里确认。
 
 ## 已知限制
 
+- **预设行的 `config` 不能凭感觉删。** 有些字段是必填且没有默认值的，漏掉一个就会让**整个预设**
+  加载失败，名册上的卡片直接显示「加载失败」，任何会话都用不了这个预设。已知必填：
+  `dsh-tool-fs-search` 的 `sampleOverCapGlobResults`、`dsh-persona` 的 `prefix`、
+  `dsh-plan-mode` 的 `section`。前两项由 `scripts/verify.mjs` 校验；新增或改动工具行时，最好
+  照抄随 dsh 发布的 `standard` 预设里同一行的 `config`。
 - **同步探测**：git 调用是同步的，整次探测最长占用 3 秒（仅每会话首次组装时）。git 缺失、
   目录不是仓库、或超时都会降级为 `(not a git repository)` 一类占位文本，不会让提示词失败。
 - **每会话一份快照**：会话中途新建的提交不会反映到提示词里，这是模板文案的既定语义。

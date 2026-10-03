@@ -80,7 +80,7 @@ const document = `# 高效模式 (Efficient Mode): one \`@deepseek-ai/dsh-agent-
           # Dynamic facts. Registers every {{...}} reference the persona template
           # below interpolates; this is the bundle's own Host plugin.
           - id: prompt-facts
-            name: '@local/dsh-efficient-mode'
+            name: '@zilorn/dsh-efficient-mode'
           # Base prompt. \`complete: true\` makes the rendered prefix this agent's
           # whole system prompt, so the template alone defines the identity.
           - id: persona
@@ -99,8 +99,12 @@ ${indented}
             disabled: !!js process.platform !== 'win32'
           - id: tool-fs
             name: '@deepseek-ai/dsh-tool-fs'
+          # The sampleOverCapGlobResults key is required by this row and has no
+          # fallback; omitting it fails the whole preset at load.
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
           - id: tool-jobs
             name: '@deepseek-ai/dsh-tool-jobs'
           - id: tool-schedule

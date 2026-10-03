@@ -26,7 +26,7 @@
  * depending on a harness package here would make activation depend on the
  * install layout.
  *
- * @module @local/dsh-efficient-mode
+ * @module @zilorn/dsh-efficient-mode
  */
 
 import { execFileSync } from 'node:child_process'
