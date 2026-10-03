@@ -13,7 +13,8 @@
  * 4. The template is rendered with a synthetic assembly context, which also
  *    proves the git probe answers for this directory.
  * 5. The compaction row still declares the 60% auto-compaction threshold and
- *    keeps its `auto` switch a plain boolean.
+ *    keeps its `auto` switch a plain boolean, and the rendered prompt tells the
+ *    agent that trigger.
  *
  * Exits non-zero on any failed check. Prints the rendered prompt last.
  *
@@ -203,6 +204,13 @@ try {
 if (rendered !== undefined) {
   if (rendered.includes('{{')) problems.push('rendered prompt still contains an unresolved {{ reference')
   if (rendered.trim().length === 0) problems.push('rendered prompt is empty')
+
+  // The agent has to be told when automatic compaction triggers, so the prompt
+  // and the configured threshold cannot drift apart silently.
+  const compactionPercent = `${Math.round(EXPECTED_COMPACTION.thresholdRatio * 100)}%`
+  if (!rendered.includes(compactionPercent)) {
+    problems.push(`rendered prompt does not state the ${compactionPercent} auto-compaction trigger`)
+  }
 
   const second = render(template, providers, context)
   if (second !== rendered) problems.push('two renders of the same session produced different text')
