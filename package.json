@@ -14,6 +14,7 @@
   "files": [
     "index.js",
     "cordis.patch.yml",
+    "base-prompt.md",
     "locale/*.json",
     "icon.svg",
     "scripts/build-patch.mjs",

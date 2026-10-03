@@ -8,11 +8,11 @@
  * literal block scalar. Nothing else in the source is touched.
  *
  * Usage:
- *   node scripts/build-patch.mjs ["/path/to/System prompt.md"]
+ *   node scripts/build-patch.mjs ["/path/to/other-prompt.md"]
  *
- * The default source is the file this preset was authored from. Re-run this
- * after editing that file, then reinstall the bundle so the profile picks up
- * the new patch.
+ * The default source is base-prompt.md in the package root, the repository's
+ * own copy of the template. Re-run this after editing it; the linked profile
+ * install re-reads the patch at boot, so restart dsh to apply.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -20,7 +20,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const SOURCE = process.argv[2] ?? '/home/zilorn/Documents/System prompt.md'
+const SOURCE = process.argv[2] ?? resolve(PACKAGE_ROOT, 'base-prompt.md')
 const TARGET = resolve(PACKAGE_ROOT, 'cordis.patch.yml')
 
 /**
@@ -45,36 +45,12 @@ const REPLACEMENTS = [
 /** Indentation of the template text inside the patch document. */
 const TEMPLATE_INDENT = 16
 
-/**
- * The source template's Context management paragraph, matched exactly.
- *
- * The paragraph is the anchor for {@link AUTO_COMPACTION_NOTE}. The source file
- * lives outside this repository and is not versioned with it, so the note the
- * preset needs is appended here instead; an edited anchor fails generation
- * loudly rather than dropping the statement from the prompt.
- */
-const CONTEXT_MANAGEMENT_ANCHOR = "When the conversation grows long, some or all of the current context is summarized; the summary, along with any remaining unsummarized context, is provided in the next context window so work can continue — you don't need to wrap up early or hand off mid-task."
-
-/**
- * What the agent is told about this preset's compaction configuration.
- *
- * It must stay consistent with the `compaction-basic` row further down
- * (`thresholdRatio: 0.6`, `auto`): `scripts/verify.mjs` checks that the rendered
- * prompt names the configured percentage.
- */
-const AUTO_COMPACTION_NOTE = 'Automatic compaction triggers once context pressure crosses 60% of the model window; the user can switch it off, leaving only the manual `/compact` command. When a compaction lands, continue from its summary and the retained recent history rather than restarting work it already covers.'
-
 let text = readFileSync(SOURCE, 'utf8').replace(/\r\n/g, '\n').replace(/\n+$/, '')
 
 for (const [from, to] of REPLACEMENTS) {
   if (!text.includes(from)) throw new Error(`${SOURCE}: placeholder not found: ${JSON.stringify(from)}`)
   text = text.replace(from, to)
 }
-
-if (!text.includes(CONTEXT_MANAGEMENT_ANCHOR)) {
-  throw new Error(`${SOURCE}: Context management paragraph not found; update CONTEXT_MANAGEMENT_ANCHOR in this script`)
-}
-text = text.replace(CONTEXT_MANAGEMENT_ANCHOR, `${CONTEXT_MANAGEMENT_ANCHOR}\n\n${AUTO_COMPACTION_NOTE}`)
 
 const leftovers = [...new Set([...text.matchAll(/\[[^\]\n]*\]/g)].map((match) => match[0]))]
 console.log('bracket groups left in the template (all prose, none a placeholder):')
