@@ -27,7 +27,7 @@
               prefix: |
                 # System prompt
 
-                You are Deepseek CODE, running within the DeepSeek harness (dsh).
+                You are an AI Agent, running within the DeepSeek harness (dsh).
 
                 You are an interactive agent that helps users with software engineering tasks.
 
