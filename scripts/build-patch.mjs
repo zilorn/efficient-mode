@@ -89,6 +89,15 @@ const document = `# 高效模式 (Efficient Mode): one \`@deepseek-ai/dsh-agent-
               complete: true
               prefix: |
 ${indented}
+          # Workspace instructions. Injects the user-global $DSH_HOME/AGENTS.md
+          # plus the project chain (AGENTS.md / CLAUDE.md from the repository
+          # root down to the session working directory) as a baseline user
+          # message, so \`complete: true\` above does not suppress it. The row
+          # requires maxBytes; 65536 matches the shipped \`standard\` preset.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
           # Capabilities, mirroring the shipped \`standard\` preset so the mode is
           # usable; README.md lists the rows deliberately left out.
           - id: tool-bash
