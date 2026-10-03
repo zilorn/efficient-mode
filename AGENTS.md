@@ -82,9 +82,11 @@ browser.
   `thresholdRatio: 0.6`, so pressure triggers at 60% of the routed model's window, and `auto` is the
   switch whose `false` keeps only manual `/compact`. Both live in the YAML template of
   [scripts/build-patch.mjs](scripts/build-patch.mjs): edit there and regenerate; the linked profile
-  install re-reads a bundle patch at boot, so restart dsh to apply.
-  [scripts/verify.mjs](scripts/verify.mjs) asserts the 60% threshold and that the switch stays a
-  boolean.
+  install re-reads a bundle patch at boot, so restart dsh to apply. The base prompt states the
+  trigger too: the generator appends `AUTO_COMPACTION_NOTE` after the source template's Context
+  management paragraph, because that source file lives outside this repository and is not versioned
+  here. [scripts/verify.mjs](scripts/verify.mjs) asserts the 60% threshold, the boolean switch, and
+  that the rendered prompt names the configured percentage.
 - **Reinstall after changes.** A local directory installs as a link, but an already-loaded JS module
   only refreshes when the dsh process restarts.
 
