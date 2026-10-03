@@ -95,8 +95,8 @@ Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.pat
 
 工具与服务的组成对齐随 dsh 发布的 `standard` 预设，这样“高效模式”是一个能直接干活的
 模式，而不是只有身份的壳：bash / pwsh（按平台二选一）、文件读写、glob/grep、后台任务、
-定时提醒、技能、goal、压缩（compaction）与工具结果裁剪、子代理（spawn 与 fork）、web、
-todo、ask_user_question、present。
+定时提醒、技能、goal、工作区指令（AGENTS.md）、压缩（compaction）与工具结果裁剪、
+子代理（spawn 与 fork）、web、todo、ask_user_question、present。
 
 刻意没有挂载的行：
 
@@ -104,11 +104,33 @@ todo、ask_user_question、present。
   `complete: true` 会把这类 section 全部丢弃。挂上它，界面上的 plan 开关只会切换状态、
   不告诉模型任何事，是明确的陷阱，所以不挂；此时 composer 的计划按钮本来就不出现。
   另外它的 Config 要求非空 `section`，缺了会在加载时报错。
-- `@deepseek-ai/dsh-agent-instructions`：它把 `AGENTS.md` 作为一条 user 消息注入，而模板
-  已经逐字包含了 `~/.dsh/AGENTS.md` 的内容，挂载会让同一份指令出现两次。模板里那段是
-  源文件的快照，不是实时读取。
 - `@deepseek-ai/dsh-time-context`：模板自带 `Today's date`，再挂一个时间上下文会重复。
 - `workflow` / `ralph` 与 codex、claude-code 子代理后端：保持组成精简。
+
+## 工作区指令（AGENTS.md）
+
+预设挂载 `@deepseek-ai/dsh-agent-instructions`，行配置与 `standard` 预设一致：
+
+```yaml
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+```
+
+会话的第一次请求会先收到一条 `<system-reminder>` user 消息：先是用户级
+`$DSH_HOME/AGENTS.md`（默认 `~/.dsh/AGENTS.md`），再是从项目根（以 `.git` 为标记）到
+会话工作目录之间每一层的 `AGENTS.md` 与 `CLAUDE.md`，以及同目录的 `AGENTS.local.md` /
+`CLAUDE.local.md` 覆盖层，顺序由宽到窄。整条消息不超过 `maxBytes`，超预算时先丢掉整份
+更宽泛的文件、再截断最具体的文件；内容相同的兄弟文件只渲染一次。agent 之后通过
+read / write / edit 进入更深目录时，下一轮请求会补上新出现的指令文件。
+
+预设必须自己挂这一行：agent preset 的 `plugins` 列表就是该 agent 的完整组成，profile 级
+`dsh-base` 里的同名行不会继承过来，缺了它 agent 就看不到项目里的 `AGENTS.md`。这条指令
+走的是 user 消息，不是系统提示词 section，所以 persona 行的 `complete: true` 不影响它。
+
+`base-prompt.md` 的 Session context 段里另有一份手写的全局偏好快照，它不随文件更新。当
+`~/.dsh/AGENTS.md` 存在时，同一份偏好会同时以模板快照和实时文件两种形式出现，两处要一起改。
 
 ## 自动压缩的时机与开关
 
@@ -169,8 +191,9 @@ node scripts/verify.mjs
 
 它会用桩上下文执行 `apply()`、从 `cordis.patch.yml` 抽出模板、核对模板引用与注册变量
 是否一一对应、检查必填 `config` 是否都在、确认压缩行仍是 60% 阈值且 `auto` 仍是布尔
-开关、确认渲染后的提示词写明了这个触发点、渲染一遍并复查同一会话两次组装结果一致，
-最后打印渲染后的完整提示词。任何一项不通过就以非零码退出。
+开关、确认工作区指令行仍挂着 `maxBytes: 65536`、确认渲染后的提示词写明了压缩触发点、
+渲染一遍并复查同一会话两次组装结果一致，最后打印渲染后的完整提示词。任何一项不通过
+就以非零码退出。
 
 安装后另需确认两点：安装结果是 `application: applied`；以及预设名册里出现 `efficient`
 卡片且不显示「加载失败」。名册卡片由 Host 的预设 list 提供，可以用 agent 的
@@ -183,8 +206,9 @@ node scripts/verify.mjs
 - **预设行的 `config` 不能凭感觉删。** 有些字段是必填且没有默认值的，漏掉一个就会让**整个预设**
   加载失败，名册上的卡片直接显示「加载失败」，任何会话都用不了这个预设。已知必填：
   `dsh-tool-fs-search` 的 `sampleOverCapGlobResults`、`dsh-persona` 的 `prefix`、
-  `dsh-plan-mode` 的 `section`。前两项由 `scripts/verify.mjs` 校验；新增或改动工具行时，最好
-  照抄随 dsh 发布的 `standard` 预设里同一行的 `config`。
+  `dsh-agent-instructions` 的 `maxBytes`、`dsh-plan-mode` 的 `section`。前三项由
+  `scripts/verify.mjs` 校验；新增或改动工具行时，最好照抄随 dsh 发布的 `standard` 预设里
+  同一行的 `config`。
 - **同步探测**：git 调用是同步的，整次探测最长占用 3 秒（仅每会话首次组装时）。git 缺失、
   目录不是仓库、或超时都会降级为 `(not a git repository)` 一类占位文本，不会让提示词失败。
 - **每会话一份快照**：会话中途新建的提交不会反映到提示词里，这是模板文案的既定语义。

@@ -12,6 +12,9 @@ A dsh (DeepSeek Harness) plugin bundle that registers one Agent preset: **Effici
   working directory, is-git-repository, platform, shell, OS version, today's date.
 - The persona row sets `complete: true`, so the rendered template is that agent's **entire** system
   prompt rather than a prefix other sections append to.
+- Workspace instruction files reach the agent separately: the preset mounts
+  `dsh-agent-instructions`, which injects the global and project `AGENTS.md`/`CLAUDE.md` chain as a
+  baseline user message rather than a system-prompt section.
 
 Layout: [cordis.patch.yml](cordis.patch.yml) declares the preset and the plugin rows it mounts,
 [index.js](index.js) supplies the dynamic facts, [scripts/build-patch.mjs](scripts/build-patch.mjs)
@@ -61,8 +64,9 @@ browser.
 - **Never drop a row's `config` on a hunch.** A missing required key fails that row, and one failed
   row fails the **whole preset**: the roster card shows 加载失败 and no session can use it. Known
   required keys are `sampleOverCapGlobResults` on `dsh-tool-fs-search`, `prefix` on `dsh-persona`,
-  and `section` on `dsh-plan-mode`. When adding or changing a tool row, copy the `config` the shipped
-  `standard` preset passes to that same row. `scripts/verify.mjs` asserts the first two.
+  `maxBytes` on `dsh-agent-instructions`, and `section` on `dsh-plan-mode`. When adding or changing a
+  tool row, copy the `config` the shipped `standard` preset passes to that same row.
+  `scripts/verify.mjs` asserts the first three.
 - **`@deepseek-ai/*` names are the real module names of packages shipped inside dsh.** The Loader
   loads them by name, so keep them verbatim; renaming one breaks resolution. This repository's own
   package is `@zilorn/dsh-efficient-mode`. Changing the scope means editing both `package.json`'s
@@ -78,6 +82,13 @@ browser.
 - **`complete: true` discards sections other plugins contribute**, so do not mount a plugin whose
   only model-facing effect is a section. `dsh-plan-mode` is the example: mounting it turns the
   composer's plan chip into a no-op the model never sees.
+- **Workspace instructions need their own row in the preset.** `dsh-agent-instructions` injects
+  `$DSH_HOME/AGENTS.md` and the project's AGENTS.md/CLAUDE.md chain as a baseline **user message**,
+  so `complete: true` does not suppress it. A preset's `plugins` list is that agent's whole
+  composition, so the profile-level row `dsh-base` mounts does not reach it; the preset declares
+  `maxBytes: 65536` itself, matching the shipped `standard` preset. The Session-context block in
+  [base-prompt.md](base-prompt.md) stays a hand-written snapshot of the global preferences and does
+  not track that file.
 - **Auto-compaction is row config inside the generated patch.** The `compaction-basic` row sets
   `thresholdRatio: 0.6`, so pressure triggers at 60% of the routed model's window, and `auto` is the
   switch whose `false` keeps only manual `/compact`. Both live in the YAML template of
