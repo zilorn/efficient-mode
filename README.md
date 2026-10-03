@@ -82,11 +82,15 @@ plugin_manager install_bundle  target=<本目录绝对路径>
 
 工具与服务的组成对齐随 dsh 发布的 `standard` 预设，这样“高效模式”是一个能直接干活的
 模式，而不是只有身份的壳：bash / pwsh（按平台二选一）、文件读写、glob/grep、后台任务、
-定时提醒、技能、goal、plan mode、压缩（compaction）与工具结果裁剪、子代理（spawn 与
-fork）、web、todo、ask_user_question、present。
+定时提醒、技能、goal、压缩（compaction）与工具结果裁剪、子代理（spawn 与 fork）、web、
+todo、ask_user_question、present。
 
 刻意没有挂载的行：
 
+- `@deepseek-ai/dsh-plan-mode`：它面向模型的唯一作用就是一段策略 section，而
+  `complete: true` 会把这类 section 全部丢弃。挂上它，界面上的 plan 开关只会切换状态、
+  不告诉模型任何事，是明确的陷阱，所以不挂；此时 composer 的计划按钮本来就不出现。
+  另外它的 Config 要求非空 `section`，缺了会在加载时报错。
 - `@deepseek-ai/dsh-agent-instructions`：它把 `AGENTS.md` 作为一条 user 消息注入，而模板
   已经逐字包含了 `~/.dsh/AGENTS.md` 的内容，挂载会让同一份指令出现两次。模板里那段是
   源文件的快照，不是实时读取。

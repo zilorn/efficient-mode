@@ -113,14 +113,9 @@ ${indented}
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal
             name: '@deepseek-ai/dsh-tool-goal'
-          - id: planning
-            name: cordis:group
-            group: true
-            isolate:
-              planMode: true
-            config:
-              - id: plan-mode
-                name: '@deepseek-ai/dsh-plan-mode'
+          # No plan-mode row: its only model-facing effect is a policy section,
+          # which \`complete: true\` suppresses, so the composer's plan chip would
+          # switch state without telling the model anything.
           - id: compaction
             name: cordis:group
             group: true
