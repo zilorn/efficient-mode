@@ -78,6 +78,13 @@ browser.
 - **`complete: true` discards sections other plugins contribute**, so do not mount a plugin whose
   only model-facing effect is a section. `dsh-plan-mode` is the example: mounting it turns the
   composer's plan chip into a no-op the model never sees.
+- **Auto-compaction is row config inside the generated patch.** The `compaction-basic` row sets
+  `thresholdRatio: 0.6`, so pressure triggers at 60% of the routed model's window, and `auto` is the
+  switch whose `false` keeps only manual `/compact`. Both live in the YAML template of
+  [scripts/build-patch.mjs](scripts/build-patch.mjs): edit there and regenerate; the linked profile
+  install re-reads a bundle patch at boot, so restart dsh to apply.
+  [scripts/verify.mjs](scripts/verify.mjs) asserts the 60% threshold and that the switch stays a
+  boolean.
 - **Reinstall after changes.** A local directory installs as a link, but an already-loaded JS module
   only refreshes when the dsh process restarts.
 

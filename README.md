@@ -109,6 +109,28 @@ todo、ask_user_question、present。
 - `@deepseek-ai/dsh-time-context`：模板自带 `Today's date`，再挂一个时间上下文会重复。
 - `workflow` / `ralph` 与 codex、claude-code 子代理后端：保持组成精简。
 
+## 自动压缩的时机与开关
+
+压缩组里的 `compaction-basic` 行显式声明了两个值：
+
+```yaml
+- id: compaction-basic
+  name: '@deepseek-ai/dsh-compaction-basic'
+  config:
+    thresholdRatio: 0.6
+    auto: true
+```
+
+上下文压力越过路由模型窗口的 60% 时，下一次请求派生前自动摘要最旧的历史；`auto` 是
+这个功能的开关，改成 `false` 后自动压缩与溢出恢复都不再注册，手动 `/compact` 仍可用。
+实际触发点取 `floor(min(W × 0.6, W − O − 65536))`：`W` 是模型窗口，`O` 是请求输出
+预留，65536 是默认 `headroomTokens`。窗口不够大时触发会早于 60%，这个余量是留给压缩
+摘要调用本身的。近期历史仍按默认 `retainRatio: 0.16` 逐字保留，它必须低于阈值比例。
+
+配置写在 `cordis.patch.yml` 里，但该文件由 `scripts/build-patch.mjs` 生成：改时机或
+开关要改脚本里的 YAML 模板并重新生成。profile 是以链接方式安装的，dsh 启动时重新
+读取 bundle 的 patch 文件，所以重启后新建的会话按新值触发。
+
 ## 修改基础提示词
 
 模板是生成出来的，不要直接改 `cordis.patch.yml` 里的 prefix 块：
@@ -139,8 +161,9 @@ node scripts/verify.mjs
 ```
 
 它会用桩上下文执行 `apply()`、从 `cordis.patch.yml` 抽出模板、核对模板引用与注册变量
-是否一一对应、检查必填 `config` 是否都在、渲染一遍并复查同一会话两次组装结果一致，最后
-打印渲染后的完整提示词。任何一项不通过就以非零码退出。
+是否一一对应、检查必填 `config` 是否都在、确认压缩行仍是 60% 阈值且 `auto` 仍是布尔
+开关、渲染一遍并复查同一会话两次组装结果一致，最后打印渲染后的完整提示词。任何一项
+不通过就以非零码退出。
 
 安装后另需确认两点：安装结果是 `application: applied`；以及预设名册里出现 `efficient`
 卡片且不显示「加载失败」。名册卡片由 Host 的预设 list 提供，可以用 agent 的
