@@ -88,3 +88,8 @@ browser.
   short.
 - Commit as soon as a task is finished; do not wait for confirmation. Split large tasks into several
   commits, one concern each.
+- After committing, report the result to the user as a table:
+
+  | Commit | Type | What changed |
+  |---|---|---|
+  | `1a0ee54` | docs | Require English commit messages in AGENTS.md |
