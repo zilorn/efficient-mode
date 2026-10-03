@@ -83,6 +83,7 @@ browser.
 
 ## Git
 
+- Write commit messages in English.
 - Message format: `feat/fix/docs/refactor: [summary]`, briefly describing what was done. Keep it
   short.
 - Commit as soon as a task is finished; do not wait for confirmation. Split large tasks into several
