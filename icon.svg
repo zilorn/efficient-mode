@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Efficient Mode">
+  <title>Efficient Mode</title>
+  <defs>
+    <linearGradient id="em-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6df6"/>
+      <stop offset="1" stop-color="#7b3ff2"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#em-bg)"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="14.25" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+  <path d="M35.5 7 L17 34.5 h10.5 L24 57 L47 28.5 H36.2 Z" fill="#ffffff"/>
+  <g stroke="#ffffff" stroke-opacity="0.5" stroke-width="2.6" stroke-linecap="round">
+    <path d="M10.5 21.5 h7"/>
+    <path d="M8 31.5 h6"/>
+    <path d="M10.5 41.5 h7"/>
+  </g>
+</svg>

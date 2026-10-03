@@ -1,0 +1,33 @@
+{
+  "name": "@local/dsh-efficient-mode",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Efficient Mode (高效模式) agent preset with a base prompt interpolated from live git and environment facts",
+  "icon": "icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "scripts/build-patch.mjs",
+    "scripts/verify.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build-patch.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "MIT"
+}
