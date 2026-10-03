@@ -113,6 +113,16 @@ if (rendered !== undefined) {
 
   const fresh = render(template, providers, { agent: { id: 'another-session', session: { header: { cwd: PACKAGE_ROOT } } } })
   if (!fresh.startsWith('# System prompt')) problems.push('rendered prompt does not start with the template heading')
+
+  // Assemblers other than the agent loop pass no agent; the loop may also omit
+  // it. A provider returning undefined would fail the whole prompt, so this path
+  // must render with its fallbacks instead of throwing.
+  try {
+    const agentless = render(template, providers, {})
+    if (!agentless.includes('### Environment')) problems.push('agentless render lost the environment section')
+  } catch (error) {
+    problems.push(`render without an agent failed: ${error.message}`)
+  }
 }
 
 console.log(`template: ${template.split('\n').length} lines, ${references.length} prompt variables`)
