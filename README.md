@@ -166,6 +166,17 @@ node scripts/verify.mjs
 - **`files` 字段对目录直装不生效**：dsh 直装本地目录时是以链接方式安装，改动源码后需要重新
   安装并重启才能加载新的 JS 模块版本。
 
+## Git 提交
+
+提交信息用英文，格式为 `feat/fix/docs/refactor: [概述]`，简短描述做了什么。完成一项任务后直接提交，
+任务量大就拆成多个提交，一个提交只做一件事（同一条约定写在 [AGENTS.md](AGENTS.md) 里）。
+
+每次提交后用表格告知用户结果：
+
+| 提交 | 类型 | 内容 |
+|---|---|---|
+| `1a0ee54` | docs | AGENTS.md 增加提交信息用英文的约定 |
+
 ## 环境
 
 - dsh 0.2.0-rc.2（Desktop，`desktop` profile）
