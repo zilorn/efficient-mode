@@ -6,10 +6,11 @@ A dsh (DeepSeek Harness) plugin bundle that registers one Agent preset: **Effici
 (id `efficient`).
 
 - The preset's base prompt is the body of [base-prompt.md](base-prompt.md), kept verbatim except
-  for 11 `[]` placeholders, which become `{{variable}}` references.
+  for 12 `[]` placeholders, which become `{{variable}}` references.
 - A Host plugin shipped in this package ([index.js](index.js)) resolves those variables on every
   prompt assembly: current branch, main branch, committer, working-tree status, last 3 commits,
-  working directory, is-git-repository, platform, shell, OS version, today's date.
+  working directory, is-git-repository, platform, shell, OS version, today's date, and the
+  input-language instruction.
 - The persona row sets `complete: true`, so the rendered template is that agent's **entire** system
   prompt rather than a prefix other sections append to.
 - Workspace instruction files reach the agent separately: the preset mounts
@@ -79,6 +80,14 @@ browser.
 - **The git probe is synchronous** (`execFileSync`, 3 second budget for the whole probe) and cached
   once per session. That matches the template's "snapshot in time" wording and keeps the prompt
   byte-identical across steps so the provider prefix cache stays reusable.
+- **The language instruction is the one per-turn value.** `{{language_instruction}}` renders the
+  Chinese-answer hint while the agent's latest *human* input is Chinese, and stays empty otherwise.
+  The `agent/inbox/claimed` listener records the verdict, because a message is claimed before its
+  step is assembled; inputs other producers inject never overwrite it, and a cache miss falls back
+  to the newest `source.kind: 'user'` message in `session.deriveMessages()`. Detection is a Han-share
+  threshold (25% of non-whitespace characters) with kana excluded. Unlike the git snapshot, this
+  makes the rendered prompt change mid-conversation; dsh projects that as a new or replaced system
+  message. `scripts/verify.mjs` replays the listener to assert both states and the log fallback.
 - **`complete: true` discards sections other plugins contribute**, so do not mount a plugin whose
   only model-facing effect is a section. `dsh-plan-mode` is the example: mounting it turns the
   composer's plan chip into a no-op the model never sees.

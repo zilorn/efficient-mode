@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Efficient Mode",
-    "description": "Adds the Efficient Mode agent preset (高效模式), whose base prompt is a template interpolated with live git and environment facts."
+    "description": "Adds the Efficient Mode agent preset (高效模式), whose base prompt is a template interpolated with live git, environment, and input-language facts."
   }
 }

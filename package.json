@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Efficient Mode (高效模式) agent preset with a base prompt interpolated from live git and environment facts",
+  "description": "Efficient Mode (高效模式) agent preset with a base prompt interpolated from live git, environment, and input-language facts",
   "icon": "icon.svg",
   "exports": {
     ".": "./index.js",
