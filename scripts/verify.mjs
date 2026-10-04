@@ -19,6 +19,10 @@
  *    shipped `standard` preset uses, so AGENTS.md files reach the agent.
  * 7. The rendered prompt still states the tool guidance the template pins
  *    (files, search, background jobs, web, skills, goals, delegation).
+ * 8. The language instruction is present exactly while the agent's latest
+ *    human input is Chinese: refreshed by the `agent/inbox/claimed` listener,
+ *    seeded from the session log on a cache miss, and unaffected by messages
+ *    other producers inject.
  *
  * Exits non-zero on any failed check. Prints the rendered prompt last.
  *
@@ -100,6 +104,15 @@ const EXPECTED_TOOL_GUIDANCE = [
   'Start independent subagent_fork delegations',
 ]
 
+/**
+ * Language-instruction markers.
+ *
+ * The instruction appears only while the latest human input is Chinese; both
+ * the answer rule and the clarification the preset promises (questions
+ * included, interim messages exempt) are part of that promise.
+ */
+const EXPECTED_LANGUAGE = ['请使用中文回答', '中途的回复无需使用中文']
+
 /** Read one scalar key from a row's own block, ignoring nested rows. */
 function rowScalar(body, key) {
   const match = new RegExp(`(?:^|\\n)\\s*${key}:\\s*(\\S+)`).exec(body)
@@ -133,11 +146,19 @@ function rowBlocks(text) {
   return blocks
 }
 
-/** Collect the variable providers `apply()` registers, without a live context. */
+/**
+ * Collect the variable providers and event listeners `apply()` registers,
+ * without a live context.
+ */
 function collectProviders() {
   const providers = new Map()
+  const listeners = new Map()
   const ctx = {
     effect: (callback) => callback(),
+    on: (name, listener) => {
+      listeners.set(name, listener)
+      return () => {}
+    },
     systemPrompt: {
       variable: (name, provider) => {
         providers.set(name, provider)
@@ -146,7 +167,7 @@ function collectProviders() {
     },
   }
   apply(ctx, {})
-  return providers
+  return { providers, listeners }
 }
 
 /**
@@ -185,7 +206,7 @@ function render(template, providers, context) {
 
 const problems = []
 
-const providers = collectProviders()
+const { providers, listeners } = collectProviders()
 const patchText = readFileSync(PATCH_PATH, 'utf8')
 const template = extractTemplate(patchText)
 
@@ -293,10 +314,64 @@ if (rendered !== undefined) {
   }
 }
 
+// The language instruction is dynamic: it must appear exactly while the
+// agent's latest human input is Chinese. Replaying the claimed-message
+// listener the Live loop fires proves both halves of that contract.
+let languageSummary = 'language: unchecked (the template did not render)'
+const claimed = listeners.get('agent/inbox/claimed')
+if (claimed === undefined) {
+  languageSummary = 'language: no agent/inbox/claimed listener registered'
+  problems.push('index.js does not observe agent/inbox/claimed; the language instruction could never update')
+} else if (rendered !== undefined) {
+  const languageAgent = { id: 'language-session', session: { header: { cwd: PACKAGE_ROOT } } }
+  const languageOf = () => providers.get('language_instruction')({ agent: languageAgent })
+  const human = (text) => ({ source: { kind: 'user' }, content: [{ type: 'text', text }] })
+
+  if (languageOf() !== '') problems.push('language instruction is present before any human input')
+
+  claimed({ agent: languageAgent, message: human('帮我修复这个报错'), turn: 1 })
+  const hint = languageOf()
+  for (const phrase of EXPECTED_LANGUAGE) {
+    if (!hint.includes(phrase)) problems.push(`Chinese input lost the language instruction "${phrase}"`)
+  }
+  if (!render(template, providers, { agent: languageAgent }).includes('中途的回复无需使用中文')) {
+    problems.push('the rendered prompt does not carry the language instruction for Chinese input')
+  }
+
+  claimed({ agent: languageAgent, message: human('please fix this bug'), turn: 2 })
+  if (languageOf() !== '') problems.push('English input still produces the language instruction')
+
+  claimed({ agent: languageAgent, message: human('再改一处'), turn: 3 })
+  claimed({
+    agent: languageAgent,
+    message: { source: { kind: 'schedule' }, content: [{ type: 'text', text: 'daily reminder' }] },
+    turn: 4,
+  })
+  if (languageOf() !== hint) problems.push('a non-human message overwrote the language verdict')
+
+  // A resumed session whose next turn no fresh input starts seeds its verdict
+  // from the last human message in the log.
+  const resumedAgent = {
+    id: 'resumed-session',
+    session: {
+      header: { cwd: PACKAGE_ROOT },
+      deriveMessages: () => [
+        { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '继续修复' }] },
+      ],
+    },
+  }
+  if (!providers.get('language_instruction')({ agent: resumedAgent }).includes('请使用中文回答')) {
+    problems.push('a resumed session ignores the last human input in its log')
+  }
+
+  languageSummary = 'language: on for Chinese human input, seeded from the log on a miss'
+}
+
 console.log(`template: ${template.split('\n').length} lines, ${references.length} prompt variables`)
 console.log(`required-config rows checked: ${checkedRows}`)
 console.log(compactionSummary)
 console.log(instructionsSummary)
+console.log(languageSummary)
 console.log(`tool-guidance phrases checked: ${EXPECTED_TOOL_GUIDANCE.length}`)
 for (const name of references) {
   const value = providers.get(name)?.(context)

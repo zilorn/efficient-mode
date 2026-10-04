@@ -29,6 +29,7 @@ const TARGET = resolve(PACKAGE_ROOT, 'cordis.patch.yml')
  * prompt variables `index.js` registers.
  */
 const REPLACEMENTS = [
+  ['[language_instruction]', '{{language_instruction}}'],
   ['Current branch: [branch]', 'Current branch: {{git_branch}}'],
   ['Main branch (you will usually use this for PRs): [branch]', 'Main branch (you will usually use this for PRs): {{git_main_branch}}'],
   ['Git user: [user_name]', 'Git user: {{git_user}}'],
@@ -74,7 +75,7 @@ const document = `# 高效模式 (Efficient Mode): one \`@deepseek-ai/dsh-agent-
       config:
         id: efficient
         name: 高效模式
-        description: 高效模式：以 System prompt 模板为基础提示词，git 与运行环境信息按会话动态填充。
+        description: 高效模式：以 System prompt 模板为基础提示词，git、运行环境与语言信息按会话动态填充。
         order: 5
         plugins:
           # Dynamic facts. Registers every {{...}} reference the persona template

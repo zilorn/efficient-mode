@@ -86,6 +86,8 @@ When referencing files in your responses, format them as markdown links so the u
 
 When you give the user a shell command they might run, put it in its own fenced code block tagged `bash` — the app adds a Run button to shell-tagged blocks. One command per block: no leading `$` prompt and no interleaved output inside the fence.
 
+[language_instruction]
+
 ## Session context
 
 `<system-reminder>`
