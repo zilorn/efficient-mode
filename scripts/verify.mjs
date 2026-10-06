@@ -18,7 +18,8 @@
  * 6. The workspace-instruction row is still mounted with the byte budget the
  *    shipped `standard` preset uses, so AGENTS.md files reach the agent.
  * 7. The rendered prompt still states the tool guidance the template pins
- *    (files, search, background jobs, web, skills, goals, delegation).
+ *    (files, search, background jobs, web, skills, goals, delegation) and the
+ *    todo_write closing rule, whose system-reminder must survive the render.
  * 8. The language instruction is present exactly while the agent's latest
  *    human input is Chinese: refreshed by the `agent/inbox/claimed` listener,
  *    seeded from the session log on a cache miss, and unaffected by messages
@@ -102,6 +103,10 @@ const EXPECTED_TOOL_GUIDANCE = [
   'the workflow tool',
   'Start independent subagent delegations',
   'Start independent subagent_fork delegations',
+  'Use the todo_write tool',
+  'call todo_write one last time',
+  'leave no step `in_progress`',
+  'Never mark unfinished work `completed`',
 ]
 
 /**
@@ -295,6 +300,13 @@ if (rendered !== undefined) {
   // notice: assert every pinned rule survived the render.
   for (const phrase of EXPECTED_TOOL_GUIDANCE) {
     if (!rendered.includes(phrase)) problems.push(`rendered prompt lost the tool guidance "${phrase}"`)
+  }
+
+  // The todo closing rule is deliberately wrapped in a <system-reminder>, the
+  // same device the Session context block uses, so it reads as an instruction
+  // that overrides habit. Dropping the wrapper would silently weaken it.
+  if (!/<system-reminder>[\s\S]*?The failure this reminder exists to prevent[\s\S]*?<\/system-reminder>/.test(rendered)) {
+    problems.push('rendered prompt lost the <system-reminder> wrapper around the todo closing rule')
   }
 
   const second = render(template, providers, context)

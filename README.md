@@ -117,10 +117,17 @@ read/write/edit 而不是 shell 的 cat，且默认 fs-observation-policy 要求
 不可信数据，引用时要给链接；技能先加载再遵循；goal 的 resume / complete / blocked 语义；
 以及 workflow 与 subagent 的委派方式。
 
+todo 规则单独用 `<system-reminder>` 包了一层：整列表替换的语义、开始前建条目、完成即标
+`completed`，以及最要紧的收尾——最终回答前必须再调一次 `todo_write`，把做完的步骤标为
+`completed`，不留 `in_progress`；工作因阻塞提前停下时则保留 `in_progress` 并在回复里说明，
+绝不为了清空列表而谎报完成。这段提醒针对的正是“活干完了、列表还停在 `in_progress`”这个
+反复出现的失败。
+
 这些规则本来由 dsh 的工具插件各自注册成系统提示词 section。`complete: true` 生效时那些
 section 会被折叠掉，只留下 persona 这一段模板，所以模板必须自己带一份；在当前桌面包上
 工具插件的 section 仍会追加在模板之后，同一段规则会各出现一次。两种情况下规则都不缺，
-代价只是可能重复一次。`scripts/verify.mjs` 逐句断言这些规则仍在渲染结果里。
+代价只是可能重复一次。`scripts/verify.mjs` 逐句断言这些规则仍在渲染结果里，并额外断言
+todo 那条仍待在 `<system-reminder>` 里。
 
 ## 语言说明（中文输入时）
 

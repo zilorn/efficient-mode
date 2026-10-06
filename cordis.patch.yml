@@ -46,6 +46,19 @@
 
                 ## Tools
 
+                Use the todo_write tool to plan multi-step work and show progress. Send the ENTIRE list on every call, because it replaces the previous list: there are no partial updates and no per-item edits. Add one todo per concrete step before you start, mark each todo `in_progress` as you begin it, and mark it `completed` as soon as it is done rather than batching completions. While work remains, at least one todo stays `in_progress`. Skip the list entirely for trivial single-step tasks.
+
+                <system-reminder>
+
+                The failure this reminder exists to prevent is a stale list: the work is finished, but the final todo still reads `in_progress` (or `pending`). Closing the list is part of the task, not optional bookkeeping.
+
+                - Before your final answer, call todo_write one last time. Mark every finished step `completed`, and leave no step `in_progress`.
+                - The moment a step is done, record it. Do not send a final answer while the step you just finished still reads `in_progress` or `pending`, and do not wait for the end to batch the completions.
+                - If work stops early, because of a blocker, an error, or a scope change, leave the unfinished step `in_progress` and say so in the reply. Never mark unfinished work `completed` just to empty the list, and remove a step you genuinely dropped.
+                - Making the last tool call and then answering without updating the list is exactly the behavior this reminder forbids.
+
+                </system-reminder>
+
                 Use the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files. Read an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes. Read a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.
 
                 Use the glob tool — not shell find — to discover files by path pattern. Use the grep tool — not shell grep or rg — to search file contents. Use read on a matched file when you need surrounding context.
