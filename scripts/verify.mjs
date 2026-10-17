@@ -218,6 +218,13 @@ const template = extractTemplate(patchText)
 let checkedRows = 0
 const rows = rowBlocks(patchText)
 for (const { name, body } of rows) {
+  if (name === '@deepseek-ai/dsh-tool-subagent') {
+    for (const key of ['persona', 'toolFilter']) {
+      if (new RegExp(`(^|\\n)\\s*${key}:`).test(body)) {
+        problems.push(`row ${name} uses removed config key "${key}"; compose child tools and persona through Agent Presets`)
+      }
+    }
+  }
   const required = REQUIRED_ROW_CONFIG.get(name)
   if (required === undefined) continue
   checkedRows += 1

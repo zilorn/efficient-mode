@@ -100,6 +100,10 @@ Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.pat
 定时提醒、技能、goal、工作区指令（AGENTS.md）、压缩（compaction）与工具结果裁剪、
 子代理（spawn 与 fork）、web、todo、ask_user_question、present。
 
+子代理继承此预设的工具组成；定时提醒工具在执行时拒绝子代理调用。委派行不接受
+`persona` 或 `toolFilter`，`scripts/verify.mjs` 会拒绝这两个已移除的配置键。独立的
+spawn 子代理需要不同组成时，通过 `agentPreset` 选择另一个已声明的预设。
+
 刻意没有挂载的行：
 
 - `@deepseek-ai/dsh-plan-mode`：它面向模型的唯一作用就是一段策略 section，而
