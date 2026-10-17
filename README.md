@@ -6,7 +6,7 @@
 
 - 预设 id：`efficient`
 - 预设名称：`高效模式`
-- 基础提示词：模板 139 行，含 12 个动态引用，全部由本包的 Host 插件提供
+- 基础提示词：模板 150 行，含 11 个动态引用，全部由本包的 Host 插件提供
 - 依赖：仅 Node 内置模块，安装时不需要拉取任何 npm 包
 
 ## 它解决什么问题
@@ -29,7 +29,6 @@
 | `Shell: [shell]` | `{{shell}}` | 非 Windows 为 `bash`，Windows 为 `pwsh` |
 | `OS Version: [OS]` | `{{os_version}}` | `os.type()` 加 `os.release()` |
 | `Today's date is [2026-09-27].` | `{{today}}` | 宿主本地日期 `YYYY-MM-DD` |
-| `[language_instruction]`（Writing for the user 段末） | `{{language_instruction}}` | 最近一条人类输入是中文时填入中文作答要求（含提问，中途回复可例外），否则为空 |
 
 模板里唯一保留的方括号是正文自带的 Markdown 链接示例 `[foo.ts](src/utils/foo.ts)`
 和 `[Bar.tsx:42](app/components/Bar.tsx:42)`，它们不是占位符。
@@ -39,9 +38,9 @@
 ```
 better-system-prompt/
 ├── package.json           # bundle 清单：dsh.bundle.patch、locale 与 icon 导出
-├── base-prompt.md         # 基础提示词模板：正文 + 12 个 {{variable}} 引用
+├── base-prompt.md         # 基础提示词模板：正文 + 11 个 {{variable}} 引用
 ├── cordis.patch.yml       # 预设声明 + persona 模板 + 工具行（由脚本生成）
-├── index.js               # Host 插件：注册 12 个提示词变量
+├── index.js               # Host 插件：注册 11 个提示词变量
 ├── locale/
 │   ├── en.json            # 插件清单里的标题与描述（英文）
 │   └── zh.json            # 同上（中文）
@@ -90,8 +89,7 @@ Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.pat
    `index.js` 用 `execFileSync` 调用 git，并给整次探测设了 3 秒总预算；失败、超时、非仓库
    目录都会降级为占位文本。第一次组装时采样，之后按会话 id 复用，所以同一会话内这些 git
    事实逐字节稳定——既符合模板里“snapshot in time, and will not update during the
-   conversation”的措辞，也让 provider 的前缀缓存保持可复用。整套变量里唯一逐轮变化的是
-   语言提示行，见下文「语言说明」。
+   conversation”的措辞，也让 provider 的前缀缓存保持可复用。
 
 ## 预设包含的能力行
 
@@ -132,33 +130,6 @@ section 会被折叠掉，只留下 persona 这一段模板，所以模板必须
 工具插件的 section 仍会追加在模板之后，同一段规则会各出现一次。两种情况下规则都不缺，
 代价只是可能重复一次。`scripts/verify.mjs` 逐句断言这些规则仍在渲染结果里，并额外断言
 todo 那条仍待在 `<system-reminder>` 里。
-
-## 语言说明（中文输入时）
-
-`base-prompt.md` 的 Writing for the user 段末是 `{{language_instruction}}`。agent 最近一条
-**人类输入**是中文时，它渲染为：
-
-```
-用户输入中文，请使用中文回答（包括提问）；中途的回复无需使用中文。
-```
-
-否则渲染为空，模型看不到任何语言要求。
-
-判定在 `index.js` 里按 Unicode 属性做：统计汉字占非空白字符的比例，达到 25% 即视为中文，
-出现日文假名则直接排除（避免把汉字较多的日文误判成中文）。所以「帮我看看这个报错」会触发，
-而英文句子里只引用一个中文词（`translate 你好 to French`）不会。
-
-开关时机利用 inbox 的领取顺序：消息在它所属的那一步组装提示词之前就被 claim，`index.js`
-监听 `agent/inbox/claimed`，只记 `source.kind === 'user'` 的消息，定时提醒、goal 续跑、
-子代理通知等其它来源不会覆盖判定。结果是：
-
-- 用户在会话中途切换语言，下一轮的系统提示词跟着切换；
-- 没有新人类输入触发的 turn（重启后由 goal 或定时提醒继续），回退读会话日志里最近一条
-  人类消息，重启不丢语言；
-- 每个 agent 一份判定，缓存上限与 git 快照相同（64 条）。
-
-这条动态引用是整套变量里唯一逐轮变化的一个，会让系统提示词在会话中途变化；dsh 把变化
-投影成新增或替换的 system 消息，而不是每一步重发整份提示词。
 
 ## 工作区指令（AGENTS.md）
 
@@ -245,9 +216,8 @@ node scripts/verify.mjs
 它会用桩上下文执行 `apply()`、从 `cordis.patch.yml` 抽出模板、核对模板引用与注册变量
 是否一一对应、检查必填 `config` 是否都在、确认压缩行仍是 60% 阈值且 `auto` 仍是布尔
 开关、确认工作区指令行仍挂着 `maxBytes: 65536`、逐句确认模板自带的工具规则仍在渲染结果里、
-确认渲染后的提示词写明了压缩触发点、回放 `agent/inbox/claimed` 监听器确认语言提示只在中文
-人类输入后出现且不被其它来源覆盖、确认无新输入时能回退读会话日志、渲染一遍并复查同一会话
-两次组装结果一致，最后打印渲染后的完整提示词。任何一项不通过就以非零码退出。
+确认渲染后的提示词写明了压缩触发点、渲染一遍并复查同一会话两次组装结果一致，最后打印
+渲染后的完整提示词。任何一项不通过就以非零码退出。
 
 安装后另需确认两点：安装结果是 `application: applied`；以及预设名册里出现 `efficient`
 卡片且不显示「加载失败」。名册卡片由 Host 的预设 list 提供，可以用 agent 的
@@ -267,10 +237,6 @@ node scripts/verify.mjs
   目录不是仓库、或超时都会降级为 `(not a git repository)` 一类占位文本，不会让提示词失败。
 - **每会话一份快照**：会话中途新建的提交不会反映到提示词里，这是模板文案的既定语义。
   想强制刷新，开新会话即可。
-- **语言提示逐轮变化**：判定只看 agent 最近一条人类输入，汉字占比 ≥25% 视为中文，出现
-  假名（日文）则排除；提示行变化会让系统提示词在会话中途更新，dsh 以新增或替换 system
-  消息的方式投影。用户在会话中途切换语言时，这就是预期行为；极短的英文回复（如 `ok`）
-  会把提示切回默认，模型仍会从上下文判断该用什么语言。
 - **`complete: true` 与工具指引**：`complete: true` 生效时，其它插件贡献的 section 会被折叠成
   persona 一段，所以工具使用规则由模板自带一份；当前桌面构建里工具插件注册的指引 section
   仍会追加在模板之后，同一段规则可能重复一次。工具本身始终可用，其参数说明始终通过工具

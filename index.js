@@ -2,10 +2,10 @@
  * Efficient Mode (高效模式) prompt facts.
  *
  * Registers the prompt variables that the `efficient` agent preset's base
- * prompt interpolates: the live git facts, the invocation environment, and the
- * input-language instruction. The preset's `deployment:persona-prefix` section
- * is a `{{variable}}` template, and the prompt registry resolves those
- * references strictly, at render time, for every model step.
+ * prompt interpolates: the live git facts and the invocation environment. The
+ * preset's `deployment:persona-prefix` section is a `{{variable}}` template, and
+ * the prompt registry resolves those references strictly, at render time, for
+ * every model step.
  *
  * Two properties shape the implementation:
  *
@@ -20,14 +20,6 @@
  *   status is "a snapshot in time, and will not update during the
  *   conversation", and a stable prompt also keeps the provider prefix cache
  *   reusable.
- *
- * The language instruction is the one deliberately per-turn value. The base
- * prompt has to tell the model to answer in Chinese exactly while the user is
- * writing Chinese, so the plugin remembers the language of each agent's latest
- * human input and refreshes that verdict whenever a message is claimed for a
- * step — the last moment before the step's prompt is assembled. Inputs from
- * other producers (scheduled prompts, goal rounds, subagents) never overwrite
- * the verdict, so the hint follows the human across the whole conversation.
  *
  * The module imports Node builtins only. A profile-installed bundle resolves
  * its bare imports from the profile, not from the dsh installation, so
@@ -63,21 +55,6 @@ const UNKNOWN = '(unknown)'
 
 /** Stand-in for a fact that only exists inside a repository. */
 const NO_REPOSITORY = '(not a git repository)'
-
-/** The instruction `{{language_instruction}}` carries while the latest human input is Chinese. */
-const CHINESE_INSTRUCTION = '用户输入中文，请使用中文回答（包括提问）；中途的回复无需使用中文。'
-
-/** Han ideographs, the script Chinese shares with Japanese kanji and rare Korean hanja. */
-const HAN = /\p{Script=Han}/u
-
-/** Japanese kana; their presence marks a text as Japanese rather than Chinese. */
-const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/u
-
-/** Whitespace, ignored when measuring a message's Han share. */
-const WHITESPACE = /\s/u
-
-/** Han share above which a message counts as Chinese. */
-const CHINESE_SHARE = 0.25
 
 /**
  * Read an effective commit count from the row config, which is optional and
@@ -196,9 +173,6 @@ function probeGit(cwd, commitCount) {
 /** Session snapshots, keyed by session id (or working directory without one). */
 const snapshots = new Map()
 
-/** Whether each agent's latest human input is Chinese; absent until first resolved. */
-const chineseInputs = new Map()
-
 /**
  * Read the session's git snapshot, probing the first time and reusing it after.
  * @param key - the session id, or the working directory when no agent is known.
@@ -249,102 +223,6 @@ function factsOf(context, commitCount) {
 }
 
 /**
- * Join the visible text of one message's content blocks.
- * @param message - a user message, or any shape an assembly may hand over.
- * @returns the concatenated text, or an empty string when there is none.
- */
-function textOf(message) {
-  const blocks = message?.content
-  if (!Array.isArray(blocks)) return ''
-  const parts = []
-  for (const block of blocks) {
-    if (block?.type === 'text' && typeof block.text === 'string') parts.push(block.text)
-  }
-  return parts.join('\n')
-}
-
-/**
- * Whether a text is predominantly Chinese.
- *
- * The Han share guards against quoted fragments: a Chinese word inside an
- * English sentence does not flip the language. Kana mark Japanese text that
- * happens to use kanji, so their presence rules Chinese out.
- * @param text - the candidate input.
- * @returns whether the text counts as Chinese.
- */
-function isChinese(text) {
-  if (typeof text !== 'string' || text.length === 0) return false
-  if (KANA.test(text)) return false
-  let characters = 0
-  let han = 0
-  for (const character of text) {
-    if (WHITESPACE.test(character)) continue
-    characters += 1
-    if (HAN.test(character)) han += 1
-  }
-  return characters > 0 && han / characters >= CHINESE_SHARE
-}
-
-/**
- * Find the latest human input in a session's existing history.
- *
- * This answers the turns no fresh input starts: a resumed session continued by
- * a goal round or a scheduled prompt still answers the person who last wrote
- * to it. A message without text (an image alone) yields an empty string.
- * @param agent - the agent being assembled, when the assembler supplied one.
- * @returns the message text, or an empty string when none can be read.
- */
-function latestHumanInput(agent) {
-  const session = agent?.session
-  if (typeof session?.deriveMessages !== 'function') return ''
-  try {
-    const messages = session.deriveMessages()
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index]
-      if (message?.role === 'user' && message.source?.kind === 'user') return textOf(message)
-    }
-  } catch {
-    return ''
-  }
-  return ''
-}
-
-/**
- * Cache one agent's language verdict, evicting the oldest entry past the cap.
- * @param key - the agent id.
- * @param chinese - whether its latest human input is Chinese.
- */
-function rememberInput(key, chinese) {
-  if (chineseInputs.size >= MAX_SNAPSHOTS) {
-    const oldest = chineseInputs.keys().next()
-    if (oldest.done !== true) chineseInputs.delete(oldest.value)
-  }
-  chineseInputs.set(key, chinese)
-}
-
-/**
- * Whether the agent's latest human input is Chinese.
- *
- * The `agent/inbox/claimed` listener fills the per-agent verdict; a cache miss
- * falls back to the session log once, so a resumed session with no claimed
- * input yet still resolves.
- * @param context - the assembly context handed to the variable provider.
- * @returns whether the language instruction applies.
- */
-function usesChinese(context) {
-  const agent = context?.agent
-  const id = agent?.id
-  const key = id === undefined ? undefined : String(id)
-  if (key !== undefined) {
-    const cached = chineseInputs.get(key)
-    if (cached !== undefined) return cached
-  }
-  const chinese = isChinese(latestHumanInput(agent))
-  if (key !== undefined) rememberInput(key, chinese)
-  return chinese
-}
-
-/**
  * Format today's date in the host's local timezone.
  * @param now - the instant to format.
  * @returns `YYYY-MM-DD`.
@@ -369,16 +247,6 @@ export function apply(ctx, config) {
     ctx.effect(() => ctx.systemPrompt.variable(variable, provider), `efficient-mode.variable(${variable})`)
   }
 
-  // A claimed message is what the step's prompt answers, and the claim happens
-  // before that step is assembled: record the language now, so the provider
-  // below can read it while rendering.
-  ctx.on('agent/inbox/claimed', ({ agent, message }) => {
-    if (message?.source?.kind !== 'user') return
-    const id = agent?.id
-    if (id === undefined) return
-    rememberInput(String(id), isChinese(textOf(message)))
-  })
-
   register('working_directory', (context) => workingDirectoryOf(context))
   register('is_git_repository', (context) => String(factsOf(context, commitCount).repository))
   register('git_branch', (context) => factsOf(context, commitCount).branch)
@@ -390,5 +258,4 @@ export function apply(ctx, config) {
   register('shell', () => (process.platform === 'win32' ? 'pwsh' : 'bash'))
   register('os_version', () => `${osType()} ${osRelease()}`)
   register('today', () => localDate())
-  register('language_instruction', (context) => (usesChinese(context) ? CHINESE_INSTRUCTION : ''))
 }

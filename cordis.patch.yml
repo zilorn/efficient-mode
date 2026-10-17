@@ -11,7 +11,7 @@
       config:
         id: efficient
         name: 高效模式
-        description: 高效模式：以 System prompt 模板为基础提示词，git、运行环境与语言信息按会话动态填充。
+        description: 高效模式：以 System prompt 模板为基础提示词，git 与运行环境信息按会话动态填充。
         order: 5
         plugins:
           # Dynamic facts. Registers every {{...}} reference the persona template
@@ -125,8 +125,6 @@
                 When referencing files in your responses, format them as markdown links so the user can click to open them. Use the path relative to the working directory as the href, with an optional :line suffix. Examples: [foo.ts](src/utils/foo.ts), [Bar.tsx:42](app/components/Bar.tsx:42). For pull requests or issues, use a markdown link with the full URL, taking owner/repo from the repository the pull request or issue belongs to — the `--repo` you passed to `gh`, or the git remote of the checkout you ran the command in — which may not be your working directory. Never write a bare `#123` or `PR #123`; if you must write a short reference, qualify it as `owner/repo#123`.
 
                 When you give the user a shell command they might run, put it in its own fenced code block tagged `bash` — the app adds a Run button to shell-tagged blocks. One command per block: no leading `$` prompt and no interleaved output inside the fence.
-
-                {{language_instruction}}
 
                 ## Session context
 
