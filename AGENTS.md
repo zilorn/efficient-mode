@@ -10,6 +10,9 @@ A dsh (DeepSeek Harness) plugin bundle that registers one Agent preset: **Effici
 - A Host plugin shipped in this package ([index.js](index.js)) resolves those variables on every
   prompt assembly: current branch, main branch, committer, working-tree status, last 3 commits,
   working directory, is-git-repository, platform, shell, OS version, and today's date.
+- A second Host plugin ([worktree.js](worktree.js)) registers `create_worktree`, `merge_worktree`,
+  and `archive_worktree` as plain tool definitions. New checkouts stay inside the session workspace;
+  the tools never fetch or push.
 - The persona row sets `complete: true`, so the rendered template is that agent's **entire** system
   prompt rather than a prefix other sections append to.
 - Workspace instruction files reach the agent separately: the preset mounts
@@ -17,20 +20,25 @@ A dsh (DeepSeek Harness) plugin bundle that registers one Agent preset: **Effici
   baseline user message rather than a system-prompt section.
 
 Layout: [cordis.patch.yml](cordis.patch.yml) declares the preset and the plugin rows it mounts,
-[index.js](index.js) supplies the dynamic facts, [scripts/build-patch.mjs](scripts/build-patch.mjs)
-generates the former from [base-prompt.md](base-prompt.md), and
-[scripts/verify.mjs](scripts/verify.mjs) checks the two halves against each other.
+[index.js](index.js) supplies the dynamic facts, [worktree.js](worktree.js) supplies the Git
+worktree tools, [scripts/build-patch.mjs](scripts/build-patch.mjs) generates the former from
+[base-prompt.md](base-prompt.md), [scripts/verify.mjs](scripts/verify.mjs) checks the two halves
+against each other, and [scripts/verify-worktree.mjs](scripts/verify-worktree.mjs) exercises the
+worktree lifecycle against a temporary repository.
 
 ## Stack
 
-- **Runtime**: Node.js >= 18, ESM. `index.js` imports only `node:child_process` and `node:os`. A
-  profile-installed bundle cannot resolve dependencies that live in the dsh installation, so this
-  package imports no harness package and has zero dependencies.
+- **Runtime**: Node.js >= 18, ESM. `index.js` imports only `node:child_process` and `node:os`;
+  `worktree.js` imports Node builtins only. A profile-installed bundle cannot resolve dependencies
+  that live in the dsh installation, so this package imports no harness package and has zero
+  dependencies.
 - **Plugin shape**: a Cordis plugin exporting `apply(ctx, config)`, `inject`, `name`; the bundle is
   `package.json` -> `dsh.bundle.patch` -> `cordis.patch.yml`.
 - **dsh APIs used**: `ctx.systemPrompt.variable(name, provider)` registers a prompt variable
   (references resolve strictly); `@deepseek-ai/dsh-persona`'s `prefix` is a `{{...}}` template
-  evaluated at render time; `@deepseek-ai/dsh-agent-preset`'s `config` declares the preset itself.
+  evaluated at render time; `@deepseek-ai/dsh-agent-preset`'s `config` declares the preset itself;
+  `ctx.tools.register` registers plain tool definitions; `ctx.workingDirectory.ensure/set` reads and
+  changes the session directory.
 - **Tooling**: pnpm, driven by the dsh plugin manager. No build step.
 
 ## Commands
@@ -41,6 +49,9 @@ node scripts/build-patch.mjs
 
 # Offline self-check: variable coverage, required config keys, render stability. Non-zero on failure.
 node scripts/verify.mjs
+
+# Worktree lifecycle against a temporary repository: create, commit, merge, conflict, archive.
+node scripts/verify-worktree.mjs
 
 # Check module exports, schemas and real prompt assembly using a client runtime
 node scripts/verify-client.mjs /path/to/resources/app/dsh
@@ -117,6 +128,33 @@ browser.
   The offline verifier rejects these obsolete entries. verify-client.mjs optionally loads
   the supplied client's modules and schemas and exercises real scoped prompt assembly,
   without adding dependencies to this package or booting a profile.
+- **Worktree tools are plain definitions, not `defineTool` calls.** The package must not import
+  `@deepseek-ai/*`, so [worktree.js](worktree.js) supplies raw parameter and output JSON Schemas
+  itself. `create_worktree` puts checkouts under `.worktrees/` inside the session workspace and adds
+  the pool to `.git/info/exclude`; `merge_worktree` requires clean source and target, uses `--no-ff`,
+  and aborts conflicts; `archive_worktree` keeps the branch by default and needs `force` for dirty
+  checkouts or unmerged branch deletion. The tools never fetch or push, and all three refuse the
+  read-only file policy; under `workspace-write` the new checkout must stay inside the session
+  workspace. [scripts/verify-worktree.mjs](scripts/verify-worktree.mjs) exercises the whole lifecycle
+  and the conflict path. Do not also mount `@deepseek-ai/dsh-experimental-tool-worktree`: it registers
+  the same `create_worktree` name and the duplicate fails the whole preset at load.
+
+## Worktree workflow
+
+When the user asks for a worktree, the agent must isolate the work:
+
+1. Call `create_worktree` before changing files. It creates a branch and checkout and moves the
+   session into it.
+2. Make every file change in that checkout. Do not edit the primary checkout for the task.
+3. When the task is complete, commit inside the worktree and report the branch, commit, and a short
+   summary to the user.
+4. Wait for the user's approval before calling `merge_worktree` or `archive_worktree`.
+5. `merge_worktree` merges only clean, committed work and aborts conflicts. `archive_worktree`
+   removes the checkout and keeps the branch unless `delete_branch: true`; `force` is for explicit
+   data loss.
+
+The same rule is in [base-prompt.md](base-prompt.md) so the model sees it at runtime. Keep the two
+copies aligned when editing either one.
 
 ## Git
 

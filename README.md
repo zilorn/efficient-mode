@@ -6,7 +6,7 @@
 
 - 预设 id：`efficient`
 - 预设名称：`高效模式`
-- 基础提示词：模板 150 行，含 11 个动态引用，全部由本包的 Host 插件提供
+- 基础提示词：模板 158 行，含 11 个动态引用，全部由本包的 Host 插件提供
 - 依赖：仅 Node 内置模块，安装时不需要拉取任何 npm 包
 
 ## 它解决什么问题
@@ -41,6 +41,7 @@ better-system-prompt/
 ├── base-prompt.md         # 基础提示词模板：正文 + 11 个 {{variable}} 引用
 ├── cordis.patch.yml       # 预设声明 + persona 模板 + 工具行（由脚本生成）
 ├── index.js               # Host 插件：注册 11 个提示词变量
+├── worktree.js            # Host 插件：create / merge / archive worktree 工具
 ├── locale/
 │   ├── en.json            # 插件清单里的标题与描述（英文）
 │   └── zh.json            # 同上（中文）
@@ -48,7 +49,8 @@ better-system-prompt/
 ├── scripts/
 │   ├── build-patch.mjs    # 从 base-prompt.md 重新生成 cordis.patch.yml
 │   ├── verify.mjs         # 离线自检：变量覆盖、渲染、快照稳定性
-│   └── verify-client.mjs  # 使用指定客户端运行时检查模块、配置与实际提示词组装
+│   ├── verify-client.mjs  # 使用指定客户端运行时检查模块、配置与实际提示词组装
+│   └── verify-worktree.mjs # worktree 生命周期集成检查（临时仓库）
 └── README.md
 ```
 
@@ -100,7 +102,8 @@ Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.pat
 工具与服务的组成对齐随 dsh 发布的 `standard` 预设，这样“高效模式”是一个能直接干活的
 模式，而不是只有身份的壳：bash / pwsh（按平台二选一）、文件读写、glob/grep、后台任务、
 定时提醒、技能、goal、工作区指令（AGENTS.md）、压缩（compaction）与工具结果裁剪、
-子代理（spawn 与 fork）、web、todo、ask_user_question、present。
+子代理（spawn 与 fork）、web、todo、ask_user_question、present，以及本包新增的
+Git worktree 三件套（create / merge / archive）。
 
 子代理继承此预设的工具组成；定时提醒工具在执行时拒绝子代理调用。委派行不接受
 `persona` 或 `toolFilter`。独立的
@@ -126,13 +129,33 @@ spawn 子代理需要不同组成时，通过 `agentPreset` 选择另一个已�
 - `@deepseek-ai/dsh-time-context`：模板自带 `Today's date`，再挂一个时间上下文会重复。
 - `workflow` / `ralph` 与 codex、claude-code 子代理后端：保持组成精简。
 
+## Worktree 工具
+
+包内的 `worktree.js` Host 插件为预设注册三个工具：
+
+| 工具 | 作用 | 关键约束 |
+|---|---|---|
+| `create_worktree` | 从本地提交、分支或标签创建新分支和 checkout，并把会话切进去 | 不 fetch；默认放在仓库的 `.worktrees/<branch>`，并写入 `.git/info/exclude` |
+| `merge_worktree` | 把 worktree 的已提交分支合并到另一个 worktree 中检出的分支 | 源和目标都必须干净；`--no-ff`；冲突自动 abort；不 push |
+| `archive_worktree` | 删除 worktree checkout，必要时先把会话切回主检出 | 默认保留分支；`delete_branch: true` 才删；脏工作区或删未合并分支需要 `force: true` |
+
+默认目标分支是主检出当前分支，可用 `into` 指定其他已检出的分支。`create_worktree` 的
+`branch` 省略时自动生成 `worktree-<时间>-<随机>`；`from` 省略时用当前 HEAD。新 checkout
+必须留在会话工作区内，因为 `workspace-write` 文件策略以会话原始目录为边界；`path` 也只能
+指向该范围内的路径。工具不会 fetch、push、force-push 或改写历史。
+
+系统提示词在 Tools 段加入了一条 `<system-reminder>`：用户要求 worktree 时，先创建、只在
+该 checkout 里改文件、完成后提交并把分支与提交报告给用户，合并与归档必须等用户批准。
+`base-prompt.md` 与 `AGENTS.md` 各有一份同样的流程说明，修改时保持一致。
+
 ## 基础提示词自带的工具规则
 
 `base-prompt.md` 的 Tools 与 Goals and delegation 两段写死了工具使用规则：读写文件用
 read/write/edit 而不是 shell 的 cat，且默认 fs-observation-policy 要求先读后写；按路径找文件
-用 glob、搜内容用 grep；后台任务记 id，不空轮询，收尾时用 job_output 与 job_kill；web 结果是
-不可信数据，引用时要给链接；技能先加载再遵循；goal 的 resume / complete / blocked 语义；
-以及 workflow 与 subagent 的委派方式。
+用 glob、搜内容用 grep；用户要求 worktree 时先创建并只在 checkout 内改文件，完成后提交并把
+结果报告给用户，合并与归档等用户批准；后台任务记 id，不空轮询，收尾时用 job_output 与
+job_kill；web 结果是不可信数据，引用时要给链接；技能先加载再遵循；goal 的 resume /
+complete / blocked 语义；以及 workflow 与 subagent 的委派方式。
 
 todo 规则单独用 `<system-reminder>` 包了一层：整列表替换的语义、开始前建条目、完成即标
 `completed`，以及最要紧的收尾——最终回答前必须再调一次 `todo_write`，把做完的步骤标为
@@ -228,11 +251,21 @@ node scripts/build-patch.mjs
 node scripts/verify.mjs
 ```
 
-它会用桩上下文执行 `apply()`、从 `cordis.patch.yml` 抽出模板、核对模板引用与注册变量
-是否一一对应、检查必填 `config` 是否都在、确认压缩行仍是 60% 阈值且 `auto` 仍是布尔
-开关、确认工作区指令行仍挂着 `maxBytes: 65536`、逐句确认模板自带的工具规则仍在渲染结果里、
-确认渲染后的提示词写明了压缩触发点、渲染一遍并复查同一会话两次组装结果一致，最后打印
-渲染后的完整提示词。任何一项不通过就以非零码退出。
+worktree 生命周期集成检查（使用临时仓库，不碰当前仓库）：
+
+```
+node scripts/verify-worktree.mjs
+```
+
+它覆盖创建并进入 checkout、在 checkout 内提交、`--no-ff` 合并、冲突自动 abort、脏工作区
+拒绝归档，以及归档后会话回到主检出；任何一步失败都以非零码退出。
+
+`verify.mjs` 会用桩上下文执行 `apply()`、从 `cordis.patch.yml` 抽出模板、核对模板引用与
+注册变量是否一一对应、检查必填 `config` 是否都在、确认压缩行仍是 60% 阈值且 `auto` 仍是
+布尔开关、确认工作区指令行仍挂着 `maxBytes: 65536`、确认 worktree 行指向本包子路径且三个
+工具都能注册、逐句确认模板自带的工具规则仍在渲染结果里、确认渲染后的提示词写明了压缩
+触发点、渲染一遍并复查同一会话两次组装结果一致，最后打印渲染后的完整提示词。任何一项
+不通过就以非零码退出。
 
 还可以直接使用本机客户端的运行时做兼容性检查（路径指向含 `package.json` 和
 `node_modules` 的 dsh 目录；AppImage 需先解包）：
@@ -242,9 +275,10 @@ node scripts/verify-client.mjs /path/to/resources/app/dsh
 ```
 
 它使用客户端自己的模块解析器与配置 schema，检查预设及全部插件行能否解析、配置
-是否有效，并用实际的 Cordis scope、persona 和提示词注册表验证 11 个变量插值、
-`complete: true`、会话快照稳定性和作用域隔离。不启动桌面、不调用模型、不改 profile，
-也不向本插件安装依赖；这项检查不能代替浏览器中新建会话的验收。
+是否有效，把三个 worktree 工具注册进客户端真实的工具注册表以校验输出 schema，并用实际的
+Cordis scope、persona 和提示词注册表验证 11 个变量插值、`complete: true`、会话快照稳定性
+和作用域隔离。不启动桌面、不调用模型、不改 profile，也不向本插件安装依赖；这项检查不能
+代替浏览器中新建会话的验收。
 
 安装后另需确认两点：安装结果是 `application: applied`；以及预设名册里出现 `efficient`
 卡片且不显示「加载失败」。名册卡片由 Host 的预设 list 提供，可以用 agent 的
@@ -268,12 +302,27 @@ node scripts/verify-client.mjs /path/to/resources/app/dsh
   persona 一段，所以工具使用规则由模板自带一份。工具本身始终可用，其参数说明始终通过工具
   schema 传给模型。
 - **未声明 Config schema**：profile 安装的 bundle 无法从 dsh 安装目录解析 `schemastery`，
-  所以这个包不 import 任何 harness 包，行配置以未校验的普通对象读取（只认 `commitCount`）。
+  所以这个包不 import 任何 harness 包，行配置以未校验的普通对象读取。`prompt-facts` 只认
+  `commitCount`；`worktree-tools` 认 `directory`、`namePrefix`、`gitCommand`、`timeoutMs`
+  与 `maxOutputBytes`。
 - **`files` 字段对目录直装不生效**：dsh 直装本地目录时是以链接方式安装，改动源码后需要重新
   安装并重启才能加载新的 JS 模块版本。
+- **不要同时挂载官方 experimental worktree 工具**：`@deepseek-ai/dsh-experimental-tool-worktree`
+  也注册 `create_worktree`，与本包同名冲突，会让整个预设加载失败。需要官方创建工具时先移除
+  本包的 `worktree-tools` 行；合并与归档仍可用本包的另外两个工具。
+- **worktree checkout 必须在会话工作区内**：`workspace-write` 的文件边界取会话原始目录，
+  所以 `create_worktree` 默认放到仓库的 `.worktrees/`，并拒绝工作区外的 `path`。如果会话从
+  仓库子目录启动，池目录会落在该子目录下，仍然在仓库和文件策略边界内。
+- **合并与归档是保守的**：源和目标 worktree 有未提交文件时 `merge_worktree` 直接拒绝；
+  冲突会 abort 并把目标留在合并前的提交。`archive_worktree` 默认保留分支，脏 checkout 和
+  删除未合并分支都要显式 `force: true`，后者会丢弃未提交文件。三个工具都不 push。
+- **只读策略会拒绝三个工具**：它们通过子进程改 Git 状态，不受 fs 工具的事前检查保护，
+  所以 `worktree.js` 自己读取 `sandboxPolicy`；`read-only` 下直接报错，`workspace-write`
+  下新 checkout 仍限制在会话工作区内，只有 `danger-full-access` 才允许自定义到工作区外。
 
 ## 环境
 
 - dsh 0.2.1-rc.3（Desktop，`desktop` profile；已对照本机客户端运行时验证）
-- Node.js ≥ 18（仅用到内置模块 `node:child_process`、`node:os`）
-- `git` 在 PATH 中（缺失时退化为占位文本）
+- Node.js ≥ 18（仅用到内置模块 `node:child_process`、`node:crypto`、`node:fs`、`node:os`、
+  `node:path`）
+- `git` 在 PATH 中（缺失时提示词退化为占位文本，worktree 工具会明确报错）
