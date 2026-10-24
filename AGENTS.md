@@ -42,6 +42,9 @@ node scripts/build-patch.mjs
 # Offline self-check: variable coverage, required config keys, render stability. Non-zero on failure.
 node scripts/verify.mjs
 
+# Check module exports, schemas and real prompt assembly using a client runtime
+node scripts/verify-client.mjs /path/to/resources/app/dsh
+
 # Syntax check
 node --check index.js
 
@@ -107,6 +110,13 @@ browser.
   wording, decide deliberately whether to sync the template copy.
 - **Reinstall after changes.** A local directory installs as a link, but an already-loaded JS module
   only refreshes when the dsh process restarts.
+- **Delegation targets dsh 0.2.1-rc.3.** The control row now owns list_agents; the
+  old dsh-tool-subagent-control/list-agents subpath is not exported. The spawn row uses
+  modelSelection: true and modelDiscovery: true, matching standard. Do not restore
+  modelSelectionSettings or backgroundMode; the provider now owns managed child behavior.
+  The offline verifier rejects these obsolete entries. verify-client.mjs optionally loads
+  the supplied client's modules and schemas and exercises real scoped prompt assembly,
+  without adding dependencies to this package or booting a profile.
 
 ## Git
 

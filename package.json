@@ -19,11 +19,13 @@
     "icon.svg",
     "scripts/build-patch.mjs",
     "scripts/verify.mjs",
+    "scripts/verify-client.mjs",
     "README.md"
   ],
   "scripts": {
     "build": "node scripts/build-patch.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "verify:client": "node scripts/verify-client.mjs"
   },
   "dsh": {
     "bundle": {

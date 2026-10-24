@@ -48,6 +48,7 @@ const TEMPLATE_INDENT = 16
 const REQUIRED_ROW_CONFIG = new Map([
   ['@deepseek-ai/dsh-tool-fs-search', ['sampleOverCapGlobResults']],
   ['@deepseek-ai/dsh-persona', ['prefix']],
+  ['@deepseek-ai/dsh-tool-subagent', ['provider']],
 ])
 
 /**
@@ -199,10 +200,18 @@ const template = extractTemplate(patchText)
 let checkedRows = 0
 const rows = rowBlocks(patchText)
 for (const { name, body } of rows) {
+  if (name === '@deepseek-ai/dsh-tool-subagent-control/list-agents') {
+    problems.push(`row ${name} is no longer exported; dsh-tool-subagent-control now registers list_agents itself`)
+  }
   if (name === '@deepseek-ai/dsh-tool-subagent') {
-    for (const key of ['persona', 'toolFilter']) {
+    for (const key of ['persona', 'toolFilter', 'modelSelectionSettings', 'backgroundMode']) {
       if (new RegExp(`(^|\\n)\\s*${key}:`).test(body)) {
-        problems.push(`row ${name} uses removed config key "${key}"; compose child tools and persona through Agent Presets`)
+        problems.push(`row ${name} uses removed config key "${key}"; use the current standard preset's delegation config`)
+      }
+    }
+    if (rowScalar(body, 'provider') === 'spawn') {
+      for (const key of ['modelSelection', 'modelDiscovery']) {
+        if (rowScalar(body, key) !== 'true') problems.push(`spawn delegation must enable ${key}`)
       }
     }
   }

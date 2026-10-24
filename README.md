@@ -47,7 +47,8 @@ better-system-prompt/
 ├── icon.svg               # 插件图标
 ├── scripts/
 │   ├── build-patch.mjs    # 从 base-prompt.md 重新生成 cordis.patch.yml
-│   └── verify.mjs         # 离线自检：变量覆盖、渲染、快照稳定性
+│   ├── verify.mjs         # 离线自检：变量覆盖、渲染、快照稳定性
+│   └── verify-client.mjs  # 使用指定客户端运行时检查模块、配置与实际提示词组装
 └── README.md
 ```
 
@@ -66,6 +67,9 @@ better-system-prompt/
 ```bash
 dsh plugin --profile desktop add /home/zilorn/Projects/better-system-prompt
 ```
+
+新版客户端需要使用 Desktop 提供的 `dsh` 命令执行此操作；npm 安装的 CLI 会拒绝管理
+`desktop` profile。也可以使用下面的 Plugins 页面或会话内插件管理工具安装。
 
 Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.patch.yml` 里的
 `preset-efficient` 行进入 Loader，预设名册出现「高效模式」，新建会话时在选择器里选它即可，
@@ -99,8 +103,19 @@ Web 端可以在 **Plugins** 页面里添加本地目录。装好后 `cordis.pat
 子代理（spawn 与 fork）、web、todo、ask_user_question、present。
 
 子代理继承此预设的工具组成；定时提醒工具在执行时拒绝子代理调用。委派行不接受
-`persona` 或 `toolFilter`，`scripts/verify.mjs` 会拒绝这两个已移除的配置键。独立的
+`persona` 或 `toolFilter`。独立的
 spawn 子代理需要不同组成时，通过 `agentPreset` 选择另一个已声明的预设。
+
+当前配置对齐 **dsh 0.2.1-rc.3** 的 `standard` 预设：
+
+- `list_agents` 由 `dsh-tool-subagent-control` 一起注册，不再挂载已移除的
+  `dsh-tool-subagent-control/list-agents` 子路径。
+- spawn 行用 `modelSelection: true` 开启模型选择，并用 `modelDiscovery: true` 注册
+  `list_subagent_models`；旧的 `modelSelectionSettings` 已移除。
+- 不再传 `backgroundMode`。新版委派统一启动受运行时管理的子代理并立即返回 id，
+  本地子代理的消息与继续会话能力由 provider 决定。
+
+`scripts/verify.mjs` 会拒绝上述旧入口和已移除的配置键，避免重新生成时带回不兼容配置。
 
 刻意没有挂载的行：
 
@@ -126,9 +141,9 @@ todo 规则单独用 `<system-reminder>` 包了一层：整列表替换的语义
 反复出现的失败。
 
 这些规则本来由 dsh 的工具插件各自注册成系统提示词 section。`complete: true` 生效时那些
-section 会被折叠掉，只留下 persona 这一段模板，所以模板必须自己带一份；在当前桌面包上
-工具插件的 section 仍会追加在模板之后，同一段规则会各出现一次。两种情况下规则都不缺，
-代价只是可能重复一次。`scripts/verify.mjs` 逐句断言这些规则仍在渲染结果里，并额外断言
+section 会被折叠掉，只留下 persona 这一段模板，所以模板必须自己带一份。已在
+0.2.1-rc.3 的实际提示词注册表中验证：组装后仅保留这一段系统提示词。
+`scripts/verify.mjs` 逐句断言这些规则仍在渲染结果里，并额外断言
 todo 那条仍待在 `<system-reminder>` 里。
 
 ## 工作区指令（AGENTS.md）
@@ -219,6 +234,18 @@ node scripts/verify.mjs
 确认渲染后的提示词写明了压缩触发点、渲染一遍并复查同一会话两次组装结果一致，最后打印
 渲染后的完整提示词。任何一项不通过就以非零码退出。
 
+还可以直接使用本机客户端的运行时做兼容性检查（路径指向含 `package.json` 和
+`node_modules` 的 dsh 目录；AppImage 需先解包）：
+
+```bash
+node scripts/verify-client.mjs /path/to/resources/app/dsh
+```
+
+它使用客户端自己的模块解析器与配置 schema，检查预设及全部插件行能否解析、配置
+是否有效，并用实际的 Cordis scope、persona 和提示词注册表验证 11 个变量插值、
+`complete: true`、会话快照稳定性和作用域隔离。不启动桌面、不调用模型、不改 profile，
+也不向本插件安装依赖；这项检查不能代替浏览器中新建会话的验收。
+
 安装后另需确认两点：安装结果是 `application: applied`；以及预设名册里出现 `efficient`
 卡片且不显示「加载失败」。名册卡片由 Host 的预设 list 提供，可以用 agent 的
 `cordis_inspect_query` 查 `Config.listConfigs`（过滤 `@deepseek-ai/dsh-agent-preset`）确认
@@ -237,9 +264,8 @@ node scripts/verify.mjs
   目录不是仓库、或超时都会降级为 `(not a git repository)` 一类占位文本，不会让提示词失败。
 - **每会话一份快照**：会话中途新建的提交不会反映到提示词里，这是模板文案的既定语义。
   想强制刷新，开新会话即可。
-- **`complete: true` 与工具指引**：`complete: true` 生效时，其它插件贡献的 section 会被折叠成
-  persona 一段，所以工具使用规则由模板自带一份；当前桌面构建里工具插件注册的指引 section
-  仍会追加在模板之后，同一段规则可能重复一次。工具本身始终可用，其参数说明始终通过工具
+- **`complete: true` 与工具指引**：其它插件贡献的 section 会被折叠成
+  persona 一段，所以工具使用规则由模板自带一份。工具本身始终可用，其参数说明始终通过工具
   schema 传给模型。
 - **未声明 Config schema**：profile 安装的 bundle 无法从 dsh 安装目录解析 `schemastery`，
   所以这个包不 import 任何 harness 包，行配置以未校验的普通对象读取（只认 `commitCount`）。
@@ -248,6 +274,6 @@ node scripts/verify.mjs
 
 ## 环境
 
-- dsh 0.2.0-rc.2（Desktop，`desktop` profile）
+- dsh 0.2.1-rc.3（Desktop，`desktop` profile；已对照本机客户端运行时验证）
 - Node.js ≥ 18（仅用到内置模块 `node:child_process`、`node:os`）
 - `git` 在 PATH 中（缺失时退化为占位文本）
