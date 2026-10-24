@@ -13,14 +13,17 @@ import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import * as Facts from '../index.js'
+import * as Worktree from '../worktree.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 if (!process.argv[2]) throw new Error('Pass the dsh runtime directory containing package.json and node_modules')
 const clientRoot = resolve(process.argv[2])
 const requireClient = createRequire(resolve(clientRoot, 'package.json'))
-const load = (name) => name === '@zilorn/dsh-efficient-mode'
-  ? Promise.resolve(Facts)
-  : import(pathToFileURL(requireClient.resolve(name)).href)
+const load = (name) => {
+  if (name === '@zilorn/dsh-efficient-mode') return Promise.resolve(Facts)
+  if (name === '@zilorn/dsh-efficient-mode/worktree') return Promise.resolve(Worktree)
+  return import(pathToFileURL(requireClient.resolve(name)).href)
+}
 const { parse } = requireClient('yaml')
 // Preserve disabled expressions as data; the checks below inspect both platform
 // branches and never evaluate code from YAML.
@@ -48,11 +51,36 @@ for (const row of rows) {
   const result = await schema['~standard'].validate(row.config ?? {})
   assert(!result.issues, `${row.id}: ${JSON.stringify(result.issues)}`)
 }
+const worktreeRow = rows.find((row) => row.id === 'worktree-tools')
+assert(worktreeRow, 'worktree-tools row is missing')
+const worktreePlugin = modules.get(worktreeRow.name)
+assert.equal(worktreePlugin.name, 'worktree-tools')
+assert.equal(typeof worktreePlugin.apply, 'function')
+assert.deepEqual([...worktreePlugin.inject].sort(), ['sandboxPolicy', 'tools', 'workingDirectory'])
 console.log(`client ${JSON.parse(readFileSync(resolve(clientRoot, 'package.json'), 'utf8')).version}: ${rows.length} plugin rows resolve and pass client schemas`)
 
 const [{ Context }, { default: SystemPrompt, renderPrompt }, { createScope }] = await Promise.all([
   load('@deepseek-ai/cordis'), load('@deepseek-ai/dsh-system-prompt'), load('@deepseek-ai/dsh-scope'),
 ])
+
+// Register the three tools with the client's real registry. This checks the
+// output schemas against the client's enforced JSON Schema subset and proves
+// the plain definitions satisfy the registry contract without a harness import.
+const { default: ToolsService } = await load('@deepseek-ai/dsh-tools')
+const toolCtx = new Context()
+try {
+  await toolCtx.plugin(SystemPrompt, { personaPrefix: '' })
+  await toolCtx.plugin(ToolsService)
+  worktreePlugin.apply({ tools: toolCtx.tools, workingDirectory: {} }, {})
+  const names = toolCtx.tools.definitions().map((definition) => definition.name)
+  for (const expected of ['create_worktree', 'merge_worktree', 'archive_worktree']) {
+    assert(names.includes(expected), `${expected} must register with the client tool registry`)
+  }
+  console.log('client tools: create_worktree, merge_worktree, archive_worktree registered')
+} finally {
+  await toolCtx.fiber.dispose()
+}
+
 const ctx = new Context()
 try {
   await ctx.plugin(SystemPrompt, { personaPrefix: 'Deployment persona' })

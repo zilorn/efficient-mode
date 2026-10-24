@@ -7,12 +7,14 @@
   "icon": "icon.svg",
   "exports": {
     ".": "./index.js",
+    "./worktree": "./worktree.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "worktree.js",
     "cordis.patch.yml",
     "base-prompt.md",
     "locale/*.json",
@@ -20,12 +22,14 @@
     "scripts/build-patch.mjs",
     "scripts/verify.mjs",
     "scripts/verify-client.mjs",
+    "scripts/verify-worktree.mjs",
     "README.md"
   ],
   "scripts": {
     "build": "node scripts/build-patch.mjs",
     "verify": "node scripts/verify.mjs",
-    "verify:client": "node scripts/verify-client.mjs"
+    "verify:client": "node scripts/verify-client.mjs",
+    "verify:worktree": "node scripts/verify-worktree.mjs"
   },
   "dsh": {
     "bundle": {

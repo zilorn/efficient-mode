@@ -114,6 +114,11 @@ ${indented}
             name: '@deepseek-ai/dsh-tool-fs-search'
             config:
               sampleOverCapGlobResults: false
+          # Git worktrees. The bundle's own Host plugin registers create_worktree,
+          # merge_worktree, and archive_worktree; the base prompt carries the
+          # user-approval rule and the isolation workflow.
+          - id: worktree-tools
+            name: '@zilorn/dsh-efficient-mode/worktree'
           - id: tool-jobs
             name: '@deepseek-ai/dsh-tool-jobs'
           - id: tool-schedule
