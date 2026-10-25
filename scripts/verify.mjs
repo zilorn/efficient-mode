@@ -18,8 +18,9 @@
  * 6. The workspace-instruction row is still mounted with the byte budget the
  *    shipped `standard` preset uses, so AGENTS.md files reach the agent.
  * 7. The rendered prompt still states the tool guidance the template pins
- *    (files, search, background jobs, web, skills, goals, delegation) and the
- *    todo_write closing rule, whose system-reminder must survive the render.
+ *    (task intake, files, search, background jobs, web, skills, goals,
+ *    delegation) and keeps the system-reminder wrappers around the task-intake
+ *    and todo_write closing rules.
  *
  * Exits non-zero on any failed check. Prints the rendered prompt last.
  *
@@ -103,6 +104,9 @@ const EXPECTED_WORKTREE_ROW = {
  * rule would otherwise be silent.
  */
 const EXPECTED_TOOL_GUIDANCE = [
+  'After the user posts a task',
+  'use grep or rg to locate the change',
+  'then read the matching file',
   'Use the read tool',
   'prefer edit for targeted changes',
   'Use the glob tool',
@@ -381,6 +385,13 @@ if (rendered !== undefined) {
   // notice: assert every pinned rule survived the render.
   for (const phrase of EXPECTED_TOOL_GUIDANCE) {
     if (!rendered.includes(phrase)) problems.push(`rendered prompt lost the tool guidance "${phrase}"`)
+  }
+
+  // The task-intake rule is wrapped so it outranks the habit of editing from
+  // memory: locate the change with grep or rg, then read the file. Dropping the
+  // wrapper would silently weaken it, so assert both parts together.
+  if (!/<system-reminder>[\s\S]*?After the user posts a task[\s\S]*?<\/system-reminder>/.test(rendered)) {
+    problems.push('rendered prompt lost the <system-reminder> wrapper around the task-intake rule')
   }
 
   // The todo closing rule is deliberately wrapped in a <system-reminder>, the

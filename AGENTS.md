@@ -114,10 +114,12 @@ browser.
 - **Tool guidance is restated in the template.** Tools and Goals and delegation in
   [base-prompt.md](base-prompt.md) carry the rules dsh's tool plugins also register as sections
   (read/write/edit, glob/grep, background jobs, web, skills, goals, delegation), because
-  `complete: true` can collapse those sections away. The todo rule additionally sits inside a
+  `complete: true` can collapse those sections away. A task-intake rule also sits inside a
+  `<system-reminder>` block: after the user posts a task, locate the change with grep or rg, then
+  read the matching file before editing. The todo rule additionally sits inside a
   `<system-reminder>` block that insists on a final `todo_write` before the answer, because agents
   kept leaving the last step `in_progress`. [scripts/verify.mjs](scripts/verify.mjs) asserts one
-  marker phrase per rule, plus that the todo reminder is still wrapped. When dsh changes its own
+  marker phrase per rule, plus that both reminders are still wrapped. When dsh changes its own
   wording, decide deliberately whether to sync the template copy.
 - **Reinstall after changes.** A local directory installs as a link, but an already-loaded JS module
   only refreshes when the dsh process restarts.

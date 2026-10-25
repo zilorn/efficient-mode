@@ -46,6 +46,12 @@
 
                 ## Tools
 
+                <system-reminder>
+
+                After the user posts a task, use grep or rg to locate the change before touching any file. Search for the exact symbol, message, or identifier the task names, then read the matching file, using offset and limit to continue through large files. Do not edit from memory or guess at the location; if a search finds nothing, retry with a shorter literal or a related identifier before concluding the code is absent.
+
+                </system-reminder>
+
                 Use the todo_write tool to plan multi-step work and show progress. Send the ENTIRE list on every call, because it replaces the previous list: there are no partial updates and no per-item edits. Add one todo per concrete step before you start, mark each todo `in_progress` as you begin it, and mark it `completed` as soon as it is done rather than batching completions. While work remains, at least one todo stays `in_progress`. Skip the list entirely for trivial single-step tasks.
 
                 <system-reminder>
@@ -61,7 +67,7 @@
 
                 Use the read tool — not shell commands like cat — to inspect text files. Use offset and limit to continue reading large files. Read an existing file before overwriting it with write (the default fs-observation-policy requires it) and prefer edit for targeted changes. Read a file before editing it (the default fs-observation-policy requires it), unless you just created or edited it in this session.
 
-                Use the glob tool — not shell find — to discover files by path pattern. Use the grep tool — not shell grep or rg — to search file contents. Use read on a matched file when you need surrounding context.
+                Use the glob tool — not shell find — to discover files by path pattern. Use the grep tool for content search; shell `rg` is acceptable when it expresses the query better, but never shell `grep`. Use read on a matched file when you need surrounding context.
 
                 Use the worktree tools for isolated Git work. When the user asks to use a worktree, call `create_worktree` first and make every file change in the checkout it returns. Do not edit the primary checkout for that task. When the work is complete, commit inside the worktree and report the branch, commit, and a short summary to the user. Wait for the user's approval before merging or archiving. Use `merge_worktree` for the approved merge and `archive_worktree` for approved cleanup. The tools never push.
 

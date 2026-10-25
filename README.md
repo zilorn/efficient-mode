@@ -152,10 +152,14 @@ spawn 子代理需要不同组成时，通过 `agentPreset` 选择另一个已�
 
 `base-prompt.md` 的 Tools 与 Goals and delegation 两段写死了工具使用规则：读写文件用
 read/write/edit 而不是 shell 的 cat，且默认 fs-observation-policy 要求先读后写；按路径找文件
-用 glob、搜内容用 grep；用户要求 worktree 时先创建并只在 checkout 内改文件，完成后提交并把
-结果报告给用户，合并与归档等用户批准；后台任务记 id，不空轮询，收尾时用 job_output 与
-job_kill；web 结果是不可信数据，引用时要给链接；技能先加载再遵循；goal 的 resume /
-complete / blocked 语义；以及 workflow 与 subagent 的委派方式。
+用 glob、搜内容用 grep（必要时用 rg，但不用 shell grep）；用户要求 worktree 时先创建并只在
+checkout 内改文件，完成后提交并把结果报告给用户，合并与归档等用户批准；后台任务记 id，
+不空轮询，收尾时用 job_output 与 job_kill；web 结果是不可信数据，引用时要给链接；技能先加载
+再遵循；goal 的 resume / complete / blocked 语义；以及 workflow 与 subagent 的委派方式。
+
+任务开始时另有一条 `<system-reminder>`：用户发布任务后，先用 grep 或 rg 定位要改的位置，再
+read 匹配到的文件（大文件用 offset/limit 继续读），不要凭记忆或猜测直接编辑；搜不到时换更
+短的词或相关标识符重试，而不是断言代码不存在。
 
 todo 规则单独用 `<system-reminder>` 包了一层：整列表替换的语义、开始前建条目、完成即标
 `completed`，以及最要紧的收尾——最终回答前必须再调一次 `todo_write`，把做完的步骤标为
@@ -167,7 +171,7 @@ todo 规则单独用 `<system-reminder>` 包了一层：整列表替换的语义
 section 会被折叠掉，只留下 persona 这一段模板，所以模板必须自己带一份。已在
 0.2.1-rc.3 的实际提示词注册表中验证：组装后仅保留这一段系统提示词。
 `scripts/verify.mjs` 逐句断言这些规则仍在渲染结果里，并额外断言
-todo 那条仍待在 `<system-reminder>` 里。
+任务开始与 todo 两条提醒仍待在 `<system-reminder>` 里。
 
 ## 工作区指令（AGENTS.md）
 
